@@ -1,0 +1,48 @@
+#[derive(Debug, Clone, Default)]
+pub struct {{struct_name}} {
+    map: HashMap<String, {{singular_struct_name}}>,
+}
+
+impl {{struct_name}} {
+    pub fn get(&self, key: &str) -> Option<&{{singular_struct_name}}> {
+        self.map.get(key)
+    }
+    
+    pub fn keys(&self) -> Vec<&String> {
+        self.map.keys().collect()
+    }
+    
+    pub fn values(&self) -> Vec<&{{singular_struct_name}}> {
+        self.map.values().collect()
+    }
+    
+    pub fn insert(&mut self, key: String, value: {{singular_struct_name}}) {
+        self.map.insert(key, value);
+    }
+    
+    pub fn count(&self) -> usize { self.map.len() }
+    
+    pub fn from_children(model: &colap::config_model::ConfigModel, parent: usize) -> Self {
+        let mut result = Self::default();
+        if let Some(node) = model.get_node(parent) {
+            if let colap::config_model::ConfigNode::Entity(e) = &*node.borrow() {
+                for &child in &e.children {
+                    if let Some(child_node) = model.get_node(child) {
+                        let node_b = child_node.borrow();
+                        if let colap::config_model::ConfigNode::Entity(_) = &*node_b {
+                            let item = {{singular_struct_name}}::from_entity(model, child);
+                            let name = node_b.name().to_string();
+                            result.insert(name, item);
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
+    
+    // Avoid error where from_entity is called on a plural entity
+    pub fn from_entity(model: &colap::config_model::ConfigModel, id: usize) -> Self {
+        Self::from_children(model, id)
+    }
+}

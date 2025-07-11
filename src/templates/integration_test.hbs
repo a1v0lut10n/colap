@@ -1,0 +1,50 @@
+use rustemo::Parser;
+use colap::cola::ColaParser;
+use colap::config_model::ConfigModel;
+use colap::model_builder::ModelBuilder;
+{{#if is_crate}}
+use {{sanitized_crate_name}}::Root;
+{{#each plural_entity_types}}
+use {{../sanitized_crate_name}}::{{this}};
+{{/each}}
+{{else}}
+use crate::Root;
+{{#each plural_entity_types}}
+use crate::{{this}};
+{{/each}}
+{{/if}}
+
+fn parse_config_file(path: &str) -> Root {
+    let content = std::fs::read_to_string(path).expect("Failed to read config file");
+    let parser = ColaParser::new();
+    let result = parser.parse(&content).expect("Failed to parse configuration");
+    let model = ModelBuilder::build_config_model(&result).expect("Failed to build config model");
+    Root::from_model(&model)
+}
+
+#[test]
+fn test_parse_configuration() {
+    let test_file = "{{test_file_path}}";
+    let config = parse_config_file(test_file);
+    // Basic validation that parsing succeeded
+    assert!(true);
+}
+
+#[test]
+fn test_debug_output() {
+    let test_file = "{{test_file_path}}";
+    let config = parse_config_file(test_file);
+    // Test that we can format the config using Debug
+    let _ = format!("{:?}", config);
+}
+
+#[test]
+fn test_plural_entities_present() {
+    let test_file = "{{test_file_path}}";
+    let config = parse_config_file(test_file);
+    
+    // Test that there's at least one instance of each plural entity type
+    {{#each plural_entity_assertions}}
+    assert!(config.{{this}}.count() > 0, "Expected at least one {{this}} to be present");
+    {{/each}}
+}

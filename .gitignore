@@ -1,0 +1,27 @@
+# JetBrains IDE
+.idea/
+**/*.iml
+
+# MacOS
+.DS_Store
+
+# Rust
+**/target/
+
+# Secrets
+**/*.json
+**/.env
+
+# Visual Studio Code
+.vscode/
+
+# Windsurf
+.windsurfrules
+*.code-workspace
+
+# Generated code
+**/generated/
+
+# Logs and cookies
+/cookies.txt
+*.log
