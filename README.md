@@ -361,8 +361,8 @@ Colap parses configurations directly from Markdown. Any fenced block marked \`\`
 
 ## 📜 License
 
-MIT © [Aivolution GmbH](https://aivolution.ch)
+This project is licensed under the [Apache License 2.0](LICENSE).
 
-This project is part of the Genite project and follows its licensing terms.
+Copyright 2025 Aivolution GmbH
 
 ---
