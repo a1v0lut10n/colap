@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::cola_actions::{
+use crate::parser::cola_actions::{
     CodeBlock, Cola, Entity, FieldList, FieldValue, MarkdownItem, NestedBlock,
 };
-use crate::config_model::{ConfigModel, ConfigValue};
-use crate::source_location::SourceLocation;
+use crate::model::config_model::{ConfigModel, ConfigValue};
+use crate::model::source_location::SourceLocation;
 use std::path::PathBuf;
 
 /// Builds a ConfigModel from a parsed Cola AST

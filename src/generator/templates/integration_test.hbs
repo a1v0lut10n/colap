@@ -1,7 +1,7 @@
 use rustemo::Parser;
-use colap::cola::ColaParser;
-use colap::config_model::ConfigModel;
-use colap::model_builder::ModelBuilder;
+use colap::parser::cola::ColaParser;
+use colap::model::config_model::ConfigModel;
+use colap::model::model_builder::ModelBuilder;
 {{#if is_crate}}
 use {{sanitized_crate_name}}::Root;
 {{#each plural_entity_types}}

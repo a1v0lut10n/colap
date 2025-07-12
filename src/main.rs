@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-mod generator;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
-use colap::cola::ColaParser;
-use colap::model_builder::ModelBuilder;
+use colap::parser::cola::ColaParser;
+use colap::model::model_builder::ModelBuilder;
 use rustemo::Parser;
 
-use generator::CodeGenerator;
+use colap::generator::{CodeGenerator, GenerationMode};
 
 fn main() -> Result<()> {
     env_logger::init();
@@ -118,7 +117,7 @@ fn generate(input_path: PathBuf, output_dir: PathBuf, crate_name: String, mode: 
     println!("\nConfig Structure:\n{}", model.pretty_display());
 
 
-    use crate::generator::GenerationMode;
+    // GenerationMode is already imported at the top
     
     // Create the appropriate GenerationMode based on the mode parameter
     let generation_mode = match mode.as_str() {

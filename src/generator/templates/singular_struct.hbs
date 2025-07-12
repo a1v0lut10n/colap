@@ -6,20 +6,20 @@ pub struct {{struct_name}} {
 }
 
 impl {{struct_name}} {
-    pub fn from_model(model: &colap::config_model::ConfigModel) -> Self {
+    pub fn from_model(model: &colap::model::config_model::ConfigModel) -> Self {
         Self::from_entity(model, model.root_id())
     }
     
-    pub fn from_entity(model: &colap::config_model::ConfigModel, id: usize) -> Self {
+    pub fn from_entity(model: &colap::model::config_model::ConfigModel, id: usize) -> Self {
         let mut result = Self::default();
         {{#each field_initializers}}
         {{#if is_entity}}
         {{#if (eq type "String")}} {{!-- Handle String fields as primitives, not entities --}}
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let colap::config_model::ConfigNode::Entity(ent) = &*node_b {
+            if let colap::model::config_model::ConfigNode::Entity(ent) = &*node_b {
                 if let Some(val) = ent.fields.get("{{original_name}}") {
-                    if let colap::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.{{name}} = s.clone();
                     }
                 }
@@ -37,25 +37,25 @@ impl {{struct_name}} {
         {{else}}
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let colap::config_model::ConfigNode::Entity(ent) = &*node_b {
+            if let colap::model::config_model::ConfigNode::Entity(ent) = &*node_b {
                 if let Some(val) = ent.fields.get("{{original_name}}") {
                     {{#if (eq type "String")}}
-                    if let colap::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.{{name}} = s.clone();
                     }
                     {{/if}}
                     {{#if (eq type "i64")}}
-                    if let colap::config_model::ConfigValue::Integer(i) = val {
+                    if let colap::model::config_model::ConfigValue::Integer(i) = val {
                         result.{{name}} = *i;
                     }
                     {{/if}}
                     {{#if (eq type "f64")}}
-                    if let colap::config_model::ConfigValue::Float(f) = val {
+                    if let colap::model::config_model::ConfigValue::Float(f) = val {
                         result.{{name}} = *f;
                     }
                     {{/if}}
                     {{#if (eq type "bool")}}
-                    if let colap::config_model::ConfigValue::Boolean(b) = val {
+                    if let colap::model::config_model::ConfigValue::Boolean(b) = val {
                         result.{{name}} = *b;
                     }
                     {{/if}}

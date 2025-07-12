@@ -21,23 +21,23 @@ impl Api {
 }
 
 impl Api {
-    pub fn from_entity(model: &colap::config_model::ConfigModel, id: usize) -> Self {
+    pub fn from_entity(model: &colap::model::config_model::ConfigModel, id: usize) -> Self {
         let mut result = Self::default();
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let colap::config_model::ConfigNode::Entity(ent) = &*node_b {
+            if let colap::model::config_model::ConfigNode::Entity(ent) = &*node_b {
                 if let Some(val) = ent.fields.get("key") {
-                    if let colap::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.key = Some(s.clone());
                     }
                 }
                 if let Some(val) = ent.fields.get("base_url") {
-                    if let colap::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.base_url = Some(s.clone());
                     }
                 }
                 if let Some(val) = ent.fields.get("type") {
-                    if let colap::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.type_ = Some(s.clone());
                     }
                 }

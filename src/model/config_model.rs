@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::source_location::SourceLocation;
+use crate::model::source_location::SourceLocation;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;

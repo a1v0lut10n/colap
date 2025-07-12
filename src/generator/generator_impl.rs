@@ -9,7 +9,7 @@ use handlebars::Handlebars;
 use chrono::Local;
 use serde_json::json;
 
-use colap::config_model::{ConfigModel, ConfigNode, ConfigValue, EntityNode};
+use crate::model::config_model::{ConfigModel, ConfigNode, ConfigValue, EntityNode};
 
 /// Generation mode for the code generator
 #[derive(Debug, Clone)]

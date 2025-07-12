@@ -146,6 +146,25 @@ colap = "0.1"
 
 ---
 
+## 📂 Codebase Structure
+
+The colap codebase is organized into the following modules:
+
+- `parser`: Handles parsing of Cola syntax using rustemo
+  - `cola.rs`: Generated parser code
+  - `cola_actions.rs`: Parser actions
+- `model`: Contains the configuration model definitions
+  - `config_model.rs`: Core configuration model and node types
+  - `model_builder.rs`: Builds config model from parsed AST
+  - `source_location.rs`: Source location tracking
+- `generator`: Code generation for Rust structs
+  - `generator_impl.rs`: Main code generator implementation
+  - `templates/`: Handlebars templates for code generation
+- `grammar`: Contains the rustemo grammar definition
+  - `cola.rustemo`: Grammar rules for the Cola language
+
+---
+
 ## 🚩 Usage
 
 ### Command Line Interface
