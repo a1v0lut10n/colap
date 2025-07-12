@@ -1,0 +1,78 @@
+#[derive(Debug, Clone, Default)]
+pub struct {{struct_name}} {
+{{#each fields}}
+    pub {{name}}: {{#if is_optional}}Option<{{type}}>{{else}}{{type}}{{/if}},
+{{/each}}
+}
+
+impl {{struct_name}} {
+{{#each fields}}
+    pub fn {{name}}(&self) -> {{#if is_optional}}Option<&{{type}}>{{else}}&{{type}}{{/if}} {
+        {{#if is_optional}}self.{{name}}.as_ref(){{else}}&self.{{name}}{{/if}}
+    }
+{{/each}}
+
+    pub fn from_model(model: &{{model_import}}::ConfigModel) -> Self {
+        Self::from_entity(model, model.root_id())
+    }
+    
+    pub fn from_entity(model: &{{model_import}}::ConfigModel, id: usize) -> Self {
+        let mut result = Self::default();
+        
+        // Process primitive fields
+        if let Some(node) = model.get_node(id) {
+            let node_b = node.borrow();
+            if let {{model_import}}::ConfigNode::Entity(ent) = &*node_b {
+                // Initialize primitive fields
+                {{#each fields}}
+                {{#unless is_entity}}
+                if let Some(val) = ent.fields.get("{{original_name}}") {
+                    {{#if (eq type "String")}}
+                    if let {{model_import}}::ConfigValue::String(s) = val {
+                        result.{{name}} = s.clone();
+                    }
+                    {{else if (eq type "i64")}}
+                    if let {{model_import}}::ConfigValue::Integer(i) = val {
+                        result.{{name}} = *i;
+                    }
+                    {{else if (eq type "f64")}}
+                    if let {{model_import}}::ConfigValue::Float(f) = val {
+                        result.{{name}} = *f;
+                    }
+                    {{else if (eq type "bool")}}
+                    if let {{model_import}}::ConfigValue::Boolean(b) = val {
+                        result.{{name}} = *b;
+                    }
+                    {{/if}}
+                }
+                {{/unless}}
+                {{/each}}
+            }
+        }
+        
+        // Process entity child fields
+        {{#each fields}}
+        {{#if is_entity}}
+        {{#if is_api}}
+        // Initialize API field
+        result.{{name}} = model.find_child_entity_by_name(id, "{{original_name}}").map(|child_id| {{type}}::from_entity(model, child_id)).unwrap_or_default();
+        {{else}}
+        {{#if is_plural}}
+        // Initialize plural entity field
+        result.{{name}} = {{type}}::from_children(model, id);
+        {{else}}
+        {{#if is_optional}}
+        // Initialize optional entity field
+        result.{{name}} = model.find_child_entity_by_name(id, "{{original_name}}").map(|child_id| {{type}}::from_entity(model, child_id));
+        {{else}}
+        // Initialize required entity field
+        result.{{name}} = model.find_child_entity_by_name(id, "{{original_name}}").map(|child_id| {{type}}::from_entity(model, child_id)).unwrap_or_default();
+        {{/if}}
+        {{/if}}
+        {{/if}}
+        {{/if}}
+        {{/each}}
+        
+        result
+    }
+}
