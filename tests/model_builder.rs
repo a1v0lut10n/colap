@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use rustemo::Parser;
 use colap::cola::ColaParser;
-use colap::config_model::{ConfigNode, ConfigValue};
+use colap::config_model::ConfigValue;
 use colap::model_builder::ModelBuilder;
 use std::fs;
 use std::path::Path;
@@ -39,7 +39,7 @@ fn test_model_builder_with_test_genite() {
         "Failed to find openai entity under llm"
     );
 
-    if let Some(openai_id) = openai_entity {
+    if let Some(_openai_id) = openai_entity {
         // Check that api entity exists under openai
         let api_path = "llm/openai/api";
         let api_entity = model.find_entity_by_path(api_path);
@@ -82,7 +82,7 @@ fn test_model_builder_with_test_genite() {
         "Failed to find models (plural) entity"
     );
 
-    if let Some(models_id) = models_entity {
+    if let Some(_models_id) = models_entity {
         // Check for one of the specific models
         let gpt4_path = "llm/openai/model/gpt-4.1";
         let gpt4_entity = model.find_entity_by_path(gpt4_path);

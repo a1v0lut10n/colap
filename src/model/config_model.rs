@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::source_location::SourceLocation;
+use crate::model::source_location::SourceLocation;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -502,7 +502,7 @@ mod tests {
         let mut model = ConfigModel::new();
 
         // Create 'llm plural llms' at root
-        let llm_id = model
+        let _llm_id = model
             .create_entity_at_path("", "llm", Some("llms"), None)
             .unwrap();
 
@@ -524,7 +524,7 @@ mod tests {
             .unwrap();
 
         // Create 'model plural models' under 'openai'
-        let models_id = model
+        let _models_id = model
             .create_entity_at_path("llm/openai", "model", Some("models"), None)
             .unwrap();
 

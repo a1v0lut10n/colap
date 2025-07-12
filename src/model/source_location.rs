@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// No external imports needed
 use std::fmt;
 use std::fmt::Formatter;
 use std::path::PathBuf;
