@@ -45,6 +45,6 @@ fn test_plural_entities_present() {
     
     // Test that there's at least one instance of each plural entity type
     {{#each plural_entity_assertions}}
-    assert!(config.{{this}}.count() > 0, "Expected at least one {{this}} to be present");
+    assert!(config.{{this.plural}}.count() > 0, "Expected at least one {{this.singular}} to be present");
     {{/each}}
 }

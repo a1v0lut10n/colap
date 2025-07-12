@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use heck::{ToPascalCase, ToSnakeCase};
 use handlebars::Handlebars;
-// Intentionally removed unused import: std::io::ErrorKind
 use chrono::Local;
 use serde_json::json;
 
@@ -170,7 +169,10 @@ impl CodeGenerator {
         // Add basic placeholders for entities to test
         // In a real implementation, we would gather these from the model
         plural_entity_types.push("Llms".to_string());
-        plural_entity_assertions.push("llms".to_string());
+        plural_entity_assertions.push(json!({
+            "plural": "llms",
+            "singular": "llm"
+        }));
         
         // Prepare the template data
         let test_data = json!({
@@ -247,7 +249,10 @@ impl CodeGenerator {
         // [This would be replaced with actual code to gather plural entities]
         // For now we're just adding basic placeholders
         plural_entity_types.push("Llms".to_string());
-        plural_entity_assertions.push("llms".to_string());
+        plural_entity_assertions.push(json!({
+            "plural": "llms",
+            "singular": "llm"
+        }));
         
         // Use the Handlebars template for integration tests
         let test_data = json!({
