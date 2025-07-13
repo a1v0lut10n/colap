@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/img/colap-logo.svg" alt="Cola-p Logo" width="300">
+  <img src="static/img/colap-logo.svg" alt="Cola-p Logo" width="500">
 </p>
 
 # 🥤 colap – A Refreshingly Simple Configuration Language Parser & Code Generator
