@@ -53,6 +53,7 @@ impl CodeGenerator {
         handlebars.register_template_string("singular_struct", include_str!("templates/singular_struct.hbs"))?;
         handlebars.register_template_string("plural_struct", include_str!("templates/plural_struct.hbs"))?;
         handlebars.register_template_string("api_struct", include_str!("templates/api_struct.hbs"))?;
+        handlebars.register_template_string("entity_struct", include_str!("templates/entity_struct.hbs"))?;
         handlebars.register_template_string("integration_test", include_str!("templates/integration_test.hbs"))?;
         handlebars.register_template_string("cargo_toml", include_str!("templates/cargo_toml.hbs"))?;
         handlebars.register_template_string("readme", include_str!("templates/readme.hbs"))?;
@@ -618,20 +619,15 @@ impl CodeGenerator {
                         return;
                     }
                     
-                    // No special cases - all entities are handled generically
+                    // For regular entity structs, use entity_struct.hbs template
                     
-                    // Generate struct definition
-                    let indent = "    ".repeat(indent_level);
-                    out.push_str(&format!("{}#[derive(Debug, Clone, Default)]\n", indent));
-                    out.push_str(&format!("{}pub struct {} {{\n", indent, struct_name));
+                    // Collect field information for the template
+                    let mut fields = Vec::new();
                     
-                    // Get all fields for this entity
-                    let mut field_names = Vec::new();
-                    let mut field_types = HashMap::new();
-                    
-                    // Process primitive fields
+                    // Process primitive fields from the entity's fields map
                     for (field_name, field_value) in &ent.fields {
                         let field_name_snake = self.field_name(field_name);
+                        let original_name = field_name.clone();
                         
                         // Determine the Rust type for this field
                         let rust_type = match field_value {
@@ -641,126 +637,63 @@ impl CodeGenerator {
                             ConfigValue::String(_) => "String".to_string(),
                         };
                         
-                        field_names.push(field_name_snake.clone());
-                        field_types.insert(field_name_snake, rust_type);
+                        fields.push(json!({
+                            "name": field_name_snake,
+                            "type": rust_type,
+                            "original_name": original_name,
+                            "optional": false
+                        }));
                     }
                     
-                    // Process entity children
-                    for &child_id in &ent.children {
-                        if let Some(child) = self.model.get_node(child_id) {
-                            let child_b = child.borrow();
-                            if let ConfigNode::Entity(child_ent) = &*child_b {
-                                // If plural, use plural name for field and plural type
-                                if let Some(plural) = &child_ent.plural_name {
-                                    let field_name = self.field_name(plural);
-                                    let field_type = self.struct_name(plural);
-                                    field_names.push(field_name.clone());
-                                    field_types.insert(field_name, field_type);
+                    // Process entity children as fields (relationships)
+                    for child_id in ent.children.clone() {
+                        if let Some(child_node) = self.model.get_node(child_id) {
+                            let child_node_b = child_node.borrow();
+                            if let ConfigNode::Entity(child_ent) = &*child_node_b {
+                                let (field_name, field_type, is_plural) = if let Some(plural) = &child_ent.plural_name {
+                                    // If plural, use plural name for field and plural type
+                                    (self.field_name(plural), self.struct_name(plural), true)
                                 } else {
-                                    let field_name = self.field_name(&child_ent.name);
-                                    let field_type = self.struct_name(&child_ent.name);
-                                    field_names.push(field_name.clone());
-                                    field_types.insert(field_name, field_type);
-                                }
+                                    (self.field_name(&child_ent.name), self.struct_name(&child_ent.name), false)
+                                };
+                                
+                                let original_name = self.to_original_case(&field_name);
+                                let is_api = field_type == "Api";
+                                
+                                fields.push(json!({
+                                    "name": field_name,
+                                    "type": field_type,
+                                    "original_name": original_name,
+                                    "optional": !is_api,
+                                    "is_entity": true,
+                                    "is_api": is_api,
+                                    "is_plural": is_plural
+                                }));
                             }
                         }
                     }
                     
-                    // Add fields to struct
-                    for field_name in &field_names {
-                        let field_type = field_types.get(field_name).unwrap();
-                        
-                        // Make singular entity fields optional (they might be missing)
-                        // But keep collection structs and primitive types as non-optional
-                        if field_type.chars().next().unwrap_or('_').is_uppercase() && 
-                           !field_type.ends_with('s') && field_name != "root" {
-                            out.push_str(&format!("{}    pub {}: Option<{}>,\n", indent, field_name, field_type));
-                        } else {
-                            out.push_str(&format!("{}    pub {}: {},\n", indent, field_name, field_type));
+                    // Prepare the template data
+                    let template_data = json!({
+                        "struct_name": struct_name,
+                        "fields": fields,
+                        "model_import": "colap::model::config_model"
+                    });
+                    
+                    // Render the template
+                    let struct_content = self.handlebars.render("entity_struct", &template_data)
+                        .expect("Failed to render entity_struct template");
+                    
+                    // Add indentation if needed
+                    if indent_level > 0 {
+                        let indent = "    ".repeat(indent_level);
+                        for line in struct_content.lines() {
+                            out.push_str(&indent);
+                            out.push_str(line);
+                            out.push_str("\n");
                         }
-                    }
-                    
-                    out.push_str(&indent);
-                    out.push_str("}\n\n");
-                    
-                    // Generate implementation for getter methods
-                    out.push_str(&format!("{}impl {} {{\n", indent, struct_name));
-                    
-                    // Add getter methods
-                    for field_name in &field_names {
-                        let return_type = field_types.get(field_name).unwrap();
-                        // If this is an optional entity field, return Option<&T>
-                        if return_type.chars().next().unwrap_or('_').is_uppercase() && 
-                           !return_type.ends_with('s') && field_name != "root" {
-                            out.push_str(&format!("{}    pub fn {}(&self) -> Option<&{}> {{\n", indent, field_name, return_type));
-                            out.push_str(&format!("{}        self.{}.as_ref()\n", indent, field_name));
-                        }
-                        // If the field is a primitive type, clone its value
-                        else if !return_type.chars().next().unwrap_or('_').is_uppercase() {
-                            out.push_str(&format!("{}    pub fn {}(&self) -> {} {{\n", indent, field_name, return_type));
-                            out.push_str(&format!("{}        self.{}.clone()\n", indent, field_name));
-                        } else {
-                            out.push_str(&format!("{}    pub fn {}(&self) -> &{} {{\n", indent, field_name, return_type));
-                            out.push_str(&format!("{}        &self.{}\n", indent, field_name));
-                        }
-                        out.push_str(&format!("{}    }}\n\n", indent));
-                    }
-                    
-                    out.push_str(&indent);
-                    out.push_str("}\n\n");
-                    
-                    // Generate implementation for from_entity method
-                    out.push_str(&format!("{}impl {} {{\n", indent, struct_name));
-                    
-                    // Add from_entity method
-                    out.push_str(&format!("{0}    pub fn from_entity(model: &colap::config_model::ConfigModel, id: usize) -> Self {{\n", indent));
-                    out.push_str(&format!("{0}        let node = model.get_node(id).expect(\"entity\");\n", indent));
-                    out.push_str(&format!("{0}        let borrowed = node.borrow();\n", indent));
-                    out.push_str(&format!("{0}        if let colap::config_model::ConfigNode::Entity(_ent) = &*borrowed {{\n", indent));
-                    out.push_str(&format!("{0}            Self {{\n", indent));
-                    
-                    // Initialize fields
-                    for field_name in &field_names {
-                        let field_type = field_types.get(field_name).unwrap();
-                        let orig_field_name = self.to_original_case(field_name);
-                        
-                        // Check if this is an entity field (starts with uppercase)
-                        if field_type.chars().next().unwrap_or('_').is_uppercase() {
-                            // Check if this is a singular entity (doesn't end with 's') or a collection
-                            if !field_type.ends_with('s') {
-                                // Singular entities - look up by original field name
-                                out.push_str(&format!("{0}                {1}: model.find_child_entity_by_name(id, \"{2}\").map(|child_id| {3}::from_entity(model, child_id)),\n", indent, field_name, orig_field_name, field_type));
-                            } else {
-                                // Collection entities - use from_children method
-                                out.push_str(&format!("{0}                {1}: {2}::from_children(model, id),\n", indent, field_name, field_type));
-                            }
-                        } else {
-                            // For primitive fields, extract the value from the model
-                            match field_type.as_str() {
-                                "i64" => out.push_str(&format!("{0}                {1}: model.get_field_value(id, \"{2}\").and_then(|v| if let colap::config_model::ConfigValue::Integer(val) = v {{ Some(val) }} else {{ None }}).unwrap_or(0),\n", indent, field_name, orig_field_name)),
-                                "f64" => out.push_str(&format!("{0}                {1}: model.get_field_value(id, \"{2}\").and_then(|v| if let colap::config_model::ConfigValue::Float(val) = v {{ Some(val) }} else {{ None }}).unwrap_or(0.0),\n", indent, field_name, orig_field_name)),
-                                "bool" => out.push_str(&format!("{0}                {1}: model.get_field_value(id, \"{2}\").and_then(|v| if let colap::config_model::ConfigValue::Boolean(val) = v {{ Some(val) }} else {{ None }}).unwrap_or(false),\n", indent, field_name, orig_field_name)),
-                                "String" => out.push_str(&format!("{0}                {1}: model.get_field_value(id, \"{2}\").and_then(|v| if let colap::config_model::ConfigValue::String(val) = v {{ Some(val.clone()) }} else {{ None }}).unwrap_or_default(),\n", indent, field_name, orig_field_name)),
-                                _ => out.push_str(&format!("{0}                {1}: Default::default(),\n", indent, field_name)),
-                            }
-                        }
-                    }
-                    
-                    out.push_str(&format!("{0}            }}\n", indent));
-                    out.push_str(&format!("{0}        }} else {{ unreachable!() }}\n", indent));
-                    out.push_str(&format!("{0}    }}\n", indent));
-                    
-                    out.push_str(&indent);
-                    out.push_str("}\n\n");
-                    
-                    // Add additional functionality for Root struct
-                    if struct_name == "Root" {
-                        out.push_str(&format!("{}impl Root {{\n", indent));
-                        out.push_str(&format!("{}    pub fn from_model(model: &colap::config_model::ConfigModel) -> Self {{\n", indent));
-                        out.push_str(&format!("{}        Self::from_entity(model, model.root_id())\n", indent));
-                        out.push_str(&format!("{}    }}\n", indent));
-                        out.push_str(&indent);
-                        out.push_str("}\n\n");
+                    } else {
+                        out.push_str(&struct_content);
                     }
                 },
                 ConfigNode::Field(_) => {},
