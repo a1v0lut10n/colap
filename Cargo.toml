@@ -8,7 +8,7 @@ readme = "README.md"
 description = "A lightweight, human-friendly configuration language parser & code generator"
 repository = "https://github.com/a1v0lut10n/colap.git"
 homepage = "https://github.com/a1v0lut10n/colap"
-keywords = ["configuration", "parser", "code generator", "cola", "configuration language"]
+keywords = ["configuration", "parser", "code-generator", "cola", "configuration-language"]
 categories = ["config", "command-line-utilities", "development-tools", "parsing", "parser-implementations"]
 
 [dependencies]
