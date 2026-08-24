@@ -8,14 +8,12 @@ use std::path::Path;
 
 /// Helper to parse a file and assert success
 fn parse_cola_file<P: AsRef<Path>>(path: P) -> Cola {
-    let input = fs::read_to_string(&path).expect(&format!(
-        "Failed to read test file: {}",
-        path.as_ref().display()
-    ));
+    let input = fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("Failed to read test file: {}", path.as_ref().display()));
     let parser = ColaParser::new();
     parser
         .parse(&input)
-        .expect(&format!("Parse failed for {}", path.as_ref().display()))
+        .unwrap_or_else(|_| panic!("Parse failed for {}", path.as_ref().display()))
 }
 
 #[test]

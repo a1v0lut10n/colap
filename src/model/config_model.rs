@@ -108,6 +108,12 @@ pub struct ConfigModel {
     original_entity_names: HashMap<String, String>, // Added to store original quoted entity names
 }
 
+impl Default for ConfigModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigModel {
     /// Create a new empty model
     pub fn new() -> Self {
@@ -329,10 +335,10 @@ impl ConfigModel {
             for &child_id in &parent_entity.children {
                 if let Some(child_node) = self.get_node(child_id) {
                     let child_borrow = child_node.borrow();
-                    if let ConfigNode::Entity(child_entity) = &*child_borrow {
-                        if child_entity.name == child_name {
-                            return Some(child_id);
-                        }
+                    if let ConfigNode::Entity(child_entity) = &*child_borrow
+                        && child_entity.name == child_name
+                    {
+                        return Some(child_id);
                     }
                 }
             }
