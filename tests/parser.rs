@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Integration tests for the Cola parser using Rustemo
-use rustemo::Parser;
 use colap::cola::ColaParser;
 use colap::cola_actions::Cola;
+use rustemo::Parser;
 use std::fs;
 use std::path::Path;
 

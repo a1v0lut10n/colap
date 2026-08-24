@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
-use colap::parser::cola::ColaParser;
 use colap::model::model_builder::ModelBuilder;
+use colap::parser::cola::ColaParser;
 use rustemo::Parser;
 
 use colap::generator::{CodeGenerator, GenerationMode};
@@ -73,14 +73,19 @@ fn main() -> Result<()> {
 
     // Get the generation mode
     let mode = matches.get_one::<String>("mode").unwrap();
-    
+
     // Create final output directory path by appending /<crate-name> to the base output
     let output_dir = base_output_dir.join(&crate_name);
 
     generate(input_path, output_dir, crate_name, mode.clone())
 }
 
-fn generate(input_path: PathBuf, output_dir: PathBuf, crate_name: String, mode: String) -> Result<()> {
+fn generate(
+    input_path: PathBuf,
+    output_dir: PathBuf,
+    crate_name: String,
+    mode: String,
+) -> Result<()> {
     let source = std::fs::read_to_string(&input_path)
         .with_context(|| format!("Unable to read {}", input_path.display()))?;
 
@@ -116,9 +121,8 @@ fn generate(input_path: PathBuf, output_dir: PathBuf, crate_name: String, mode: 
     // Display the configuration using pretty_display
     println!("\nConfig Structure:\n{}", model.pretty_display());
 
-
     // GenerationMode is already imported at the top
-    
+
     // Create the appropriate GenerationMode based on the mode parameter
     let generation_mode = match mode.as_str() {
         "module" => {
@@ -136,12 +140,8 @@ fn generate(input_path: PathBuf, output_dir: PathBuf, crate_name: String, mode: 
             }
         }
     };
-    
-    let mut generator = CodeGenerator::new(
-        model,
-        generation_mode,
-        input_path.clone(),
-    )?;
+
+    let mut generator = CodeGenerator::new(model, generation_mode, input_path.clone())?;
     generator.generate()?;
 
     log::info!("Successfully generated code to {}", output_dir.display());
