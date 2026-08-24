@@ -60,9 +60,8 @@ pub fn line_tokens(line: &str, state: LineState) -> (Vec<Token>, LineState) {
     let fence = trimmed.trim_start();
     match state {
         LineState::Prose => {
-            if fence.starts_with("```") {
-                let info = fence[3..].trim();
-                let next = if info == "cola" {
+            if let Some(info) = fence.strip_prefix("```") {
+                let next = if info.trim() == "cola" {
                     LineState::Cola
                 } else {
                     LineState::Code
