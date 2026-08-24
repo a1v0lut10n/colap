@@ -4,9 +4,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use heck::{ToPascalCase, ToSnakeCase};
-use handlebars::Handlebars;
 use chrono::Local;
+use handlebars::Handlebars;
+use heck::{ToPascalCase, ToSnakeCase};
 use serde_json::json;
 
 use crate::model::config_model::{ConfigModel, ConfigNode, ConfigValue, EntityNode};
@@ -15,9 +15,7 @@ use crate::model::config_model::{ConfigModel, ConfigNode, ConfigValue, EntityNod
 #[derive(Debug, Clone)]
 pub enum GenerationMode {
     /// Generate a single .rs module file
-    Module {
-        output_file: PathBuf,
-    },
+    Module { output_file: PathBuf },
     /// Generate a complete library crate
     Crate {
         output_dir: PathBuf,
@@ -41,26 +39,37 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     /// Create a new code generator
-    pub fn new(
-        model: ConfigModel,
-        mode: GenerationMode,
-        source_path: PathBuf,
-    ) -> Result<Self> {
+    pub fn new(model: ConfigModel, mode: GenerationMode, source_path: PathBuf) -> Result<Self> {
         let mut handlebars = Handlebars::new();
-        
+
         // Register templates
-        handlebars.register_template_string("file_header", include_str!("templates/file_header.hbs"))?;
-        handlebars.register_template_string("singular_struct", include_str!("templates/singular_struct.hbs"))?;
-        handlebars.register_template_string("plural_struct", include_str!("templates/plural_struct.hbs"))?;
-        handlebars.register_template_string("api_struct", include_str!("templates/api_struct.hbs"))?;
-        handlebars.register_template_string("entity_struct", include_str!("templates/entity_struct.hbs"))?;
-        handlebars.register_template_string("integration_test", include_str!("templates/integration_test.hbs"))?;
-        handlebars.register_template_string("cargo_toml", include_str!("templates/cargo_toml.hbs"))?;
+        handlebars
+            .register_template_string("file_header", include_str!("templates/file_header.hbs"))?;
+        handlebars.register_template_string(
+            "singular_struct",
+            include_str!("templates/singular_struct.hbs"),
+        )?;
+        handlebars.register_template_string(
+            "plural_struct",
+            include_str!("templates/plural_struct.hbs"),
+        )?;
+        handlebars
+            .register_template_string("api_struct", include_str!("templates/api_struct.hbs"))?;
+        handlebars.register_template_string(
+            "entity_struct",
+            include_str!("templates/entity_struct.hbs"),
+        )?;
+        handlebars.register_template_string(
+            "integration_test",
+            include_str!("templates/integration_test.hbs"),
+        )?;
+        handlebars
+            .register_template_string("cargo_toml", include_str!("templates/cargo_toml.hbs"))?;
         handlebars.register_template_string("readme", include_str!("templates/readme.hbs"))?;
-        
+
         // Enable built-in helpers
         handlebars.set_strict_mode(false);
-        
+
         Ok(Self {
             model,
             mode,
@@ -74,12 +83,11 @@ impl CodeGenerator {
     /// Entry point – generate code based on the configured mode.
     pub fn generate(&mut self) -> Result<()> {
         match &self.mode {
-            GenerationMode::Module { output_file } => {
-                self.generate_module(output_file.clone())
-            }
-            GenerationMode::Crate { output_dir, crate_name } => {
-                self.generate_crate(output_dir.clone(), crate_name.clone())
-            }
+            GenerationMode::Module { output_file } => self.generate_module(output_file.clone()),
+            GenerationMode::Crate {
+                output_dir,
+                crate_name,
+            } => self.generate_crate(output_dir.clone(), crate_name.clone()),
         }
     }
 
@@ -94,13 +102,13 @@ impl CodeGenerator {
 
         let mut out = String::new();
         self.generate_code_content(&mut out)?;
-        
+
         // Add module-level tests
         self.generate_module_tests(&mut out)?;
 
         // Write the output to the file
         fs::write(&output_file, out)?;
-        
+
         Ok(())
     }
 
@@ -108,22 +116,22 @@ impl CodeGenerator {
     fn generate_crate(&mut self, output_dir: PathBuf, crate_name: String) -> Result<()> {
         // Create crate directory structure
         fs::create_dir_all(output_dir.join("src"))?;
-        
+
         // Generate Cargo.toml
         self.generate_cargo_toml(&output_dir, &crate_name)?;
-        
+
         // Generate src/lib.rs
         let mut lib_content = String::new();
         self.generate_code_content(&mut lib_content)?;
         fs::write(output_dir.join("src").join("lib.rs"), lib_content)?;
-        
+
         // Generate tests in tests/ directory
         fs::create_dir_all(output_dir.join("tests"))?;
         self.generate_crate_tests(&output_dir)?;
-        
+
         // Generate README.md
         self.generate_readme(&output_dir, &crate_name)?;
-        
+
         Ok(())
     }
 
@@ -131,20 +139,20 @@ impl CodeGenerator {
     fn generate_code_content(&mut self, out: &mut String) -> Result<()> {
         // Determine if we need HashMap
         let uses_hashmap = true; // In the future, we could analyze the model to determine this
-        
+
         // Create the template data for file header
         let header_data = json!({
             "include_imports": true,
             "uses_hashmap": uses_hashmap
         });
-        
+
         // Render the file header
         let header_content = self.handlebars.render("file_header", &header_data)?;
         out.push_str(&header_content);
-        
+
         // Add necessary imports
         out.push_str("use colap::config_model::{ConfigModel, ConfigNode, ConfigValue};\n\n");
-        
+
         // First identify all plural entity instances so we can skip them later
         self.identify_plural_instances(self.model.root_id());
 
@@ -157,7 +165,7 @@ impl CodeGenerator {
 
         // Generate all entity definitions recursively
         self.emit_all_entities(self.model.root_id(), &struct_names, out);
-        
+
         Ok(())
     }
 
@@ -166,7 +174,7 @@ impl CodeGenerator {
         // Create a list of plural entity types for assertions
         let mut plural_entity_types = Vec::new();
         let mut plural_entity_assertions = Vec::new();
-        
+
         // Add basic placeholders for entities to test
         // In a real implementation, we would gather these from the model
         plural_entity_types.push("Llms".to_string());
@@ -174,7 +182,7 @@ impl CodeGenerator {
             "plural": "llms",
             "singular": "llm"
         }));
-        
+
         // Prepare the template data
         let test_data = json!({
             "crate_name": "", // Empty for modules as they use relative paths
@@ -183,15 +191,15 @@ impl CodeGenerator {
             "plural_entity_types": plural_entity_types,
             "plural_entity_assertions": plural_entity_assertions
         });
-        
+
         // Render the test template
         let module_test_content = self.handlebars.render("integration_test", &test_data)?;
-        
+
         // Format for inclusion in the module
         out.push_str("\n#[cfg(test)]\n");
         out.push_str("mod tests {\n");
         out.push_str("    use super::*;\n");
-        
+
         // Add the rendered test content with proper indentation
         for line in module_test_content.lines() {
             if !line.trim().is_empty() {
@@ -200,7 +208,7 @@ impl CodeGenerator {
                 out.push_str("\n");
             }
         }
-        
+
         out.push_str("}\n");
         Ok(())
     }
@@ -210,19 +218,19 @@ impl CodeGenerator {
         // Figure out the relative path to colap crate from the output directory
         // This is a simplified approach; in a real-world scenario, you might need a more robust solution
         let colap_path = "../colap".to_string();
-        
+
         // Create the template data
         let cargo_data = json!({
             "crate_name": crate_name,
             "colap_path": colap_path,
         });
-        
+
         // Render the Cargo.toml using the Handlebars template
         let cargo_content = self.handlebars.render("cargo_toml", &cargo_data)?;
-        
+
         // Write the Cargo.toml file
         fs::write(output_dir.join("Cargo.toml"), cargo_content)?;
-        
+
         log::info!("Generated Cargo.toml for {}", crate_name);
         Ok(())
     }
@@ -230,23 +238,23 @@ impl CodeGenerator {
     /// Generate integration tests for the crate
     fn generate_crate_tests(&self, output_dir: &PathBuf) -> Result<()> {
         let tests_dir = output_dir.join("tests");
-        
+
         // Create tests directory if it doesn't exist
         fs::create_dir_all(&tests_dir)?;
-        
+
         // Create tests/data directory and copy input configuration file
         self.copy_config_to_tests_data(output_dir)?;
-        
+
         // Get the crate name for import paths
         let crate_name = self.get_crate_name();
-        
+
         // Create a sanitized crate name for Rust imports (replace hyphens with underscores)
         let sanitized_crate_name = crate_name.replace('-', "_");
-        
+
         // Generate a list of plural entity types for assertions
         let mut plural_entity_types = Vec::new();
         let mut plural_entity_assertions = Vec::new();
-        
+
         // [This would be replaced with actual code to gather plural entities]
         // For now we're just adding basic placeholders
         plural_entity_types.push("Llms".to_string());
@@ -254,7 +262,7 @@ impl CodeGenerator {
             "plural": "llms",
             "singular": "llm"
         }));
-        
+
         // Use the Handlebars template for integration tests
         let test_data = json!({
             "crate_name": crate_name,
@@ -264,46 +272,52 @@ impl CodeGenerator {
             "plural_entity_types": plural_entity_types,
             "plural_entity_assertions": plural_entity_assertions
         });
-        
+
         let test_content = self.handlebars.render("integration_test", &test_data)?;
         fs::write(tests_dir.join("integration.rs"), test_content)?;
-        
+
         Ok(())
     }
-    
+
     /// Copy the input configuration file to the tests/data directory
     fn copy_config_to_tests_data(&self, output_dir: &PathBuf) -> Result<()> {
         // Create tests/data directory
         let tests_data_dir = output_dir.join("tests").join("data");
         fs::create_dir_all(&tests_data_dir)?;
-        
+
         // Get the source filename without path
-        let source_filename = self.source_path
+        let source_filename = self
+            .source_path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-        
+
         // Copy the input file to tests/data/config.md
         fs::copy(&self.source_path, tests_data_dir.join("config.md"))?;
-        
-        log::info!("Copied {} to {}", source_filename, tests_data_dir.join("config.md").display());
-        
+
+        log::info!(
+            "Copied {} to {}",
+            source_filename,
+            tests_data_dir.join("config.md").display()
+        );
+
         Ok(())
     }
 
     /// Generate README.md for the crate
     fn generate_readme(&self, output_dir: &PathBuf, crate_name: &str) -> Result<()> {
         // Extract the config filename from the source path
-        let config_filename = self.source_path
+        let config_filename = self
+            .source_path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-        
+
         // Get the current date
         let date = Local::now().format("%Y-%m-%d").to_string();
-        
+
         // Create the template data
         let readme_data = json!({
             "crate_name": crate_name,
@@ -311,13 +325,13 @@ impl CodeGenerator {
             "date": date,
             "example_code": ""
         });
-        
+
         // Render the README using the Handlebars template
         let readme_content = self.handlebars.render("readme", &readme_data)?;
-        
+
         // Write the README file
         fs::write(output_dir.join("README.md"), readme_content)?;
-        
+
         log::info!("Generated README.md for {}", crate_name);
         Ok(())
     }
@@ -342,7 +356,7 @@ impl CodeGenerator {
                         self.plural_instances.insert(child_id);
                     }
                 }
-                
+
                 // Recursively process all children
                 for &child_id in &ent.children {
                     self.identify_plural_instances(child_id);
@@ -350,9 +364,14 @@ impl CodeGenerator {
             }
         }
     }
-    
+
     /// Identify plural entities and emit singular entity structs for them
-    fn identify_and_emit_singular_entities(&mut self, node_id: usize, struct_names: &HashMap<usize, String>, out: &mut String) {
+    fn identify_and_emit_singular_entities(
+        &mut self,
+        node_id: usize,
+        struct_names: &HashMap<usize, String>,
+        out: &mut String,
+    ) {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
             if let ConfigNode::Entity(ent) = &*node_b {
@@ -361,7 +380,7 @@ impl CodeGenerator {
                     // This is a plural entity - get first child to generate singular entity struct
                     if !ent.children.is_empty() {
                         let first_child_id = ent.children[0];
-                        
+
                         // Use first child as template for the singular entity
                         if let Some(first_child) = self.model.get_node(first_child_id) {
                             let first_child_b = first_child.borrow();
@@ -369,13 +388,18 @@ impl CodeGenerator {
                                 // Generate the singular struct from this child
                                 let singular_struct_name = self.struct_name(&ent.name);
                                 if !self.emitted_structs.contains(&singular_struct_name) {
-                                    self.emit_singular_struct(first_child_id, &singular_struct_name, struct_names, out);
+                                    self.emit_singular_struct(
+                                        first_child_id,
+                                        &singular_struct_name,
+                                        struct_names,
+                                        out,
+                                    );
                                 }
                             }
                         }
                     }
                 }
-                
+
                 // Recursively process all children
                 for &child_id in &ent.children {
                     self.identify_and_emit_singular_entities(child_id, struct_names, out);
@@ -383,12 +407,18 @@ impl CodeGenerator {
             }
         }
     }
-    
+
     /// Emit a singular struct for a plural entity type based on its first child
-    fn emit_singular_struct(&mut self, node_id: usize, struct_name: &str, _struct_names: &HashMap<usize, String>, out: &mut String) {
+    fn emit_singular_struct(
+        &mut self,
+        node_id: usize,
+        struct_name: &str,
+        _struct_names: &HashMap<usize, String>,
+        out: &mut String,
+    ) {
         // Mark this struct as emitted so we don't duplicate it
         self.emitted_structs.insert(struct_name.to_string());
-        
+
         // Extract fields from the entity
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
@@ -397,12 +427,12 @@ impl CodeGenerator {
                 let mut fields = Vec::new();
                 let mut getters = Vec::new();
                 let mut field_initializers = Vec::new();
-                
+
                 // Process primitive fields
                 for (field_name, field_value) in &ent.fields {
                     let field_name_snake = self.field_name(field_name);
                     let orig_field_name = field_name.clone();
-                    
+
                     // Determine the Rust type for this field
                     let rust_type = match field_value {
                         ConfigValue::Integer(_) => "i64".to_string(),
@@ -410,14 +440,14 @@ impl CodeGenerator {
                         ConfigValue::Boolean(_) => "bool".to_string(),
                         ConfigValue::String(_) => "String".to_string(),
                     };
-                    
+
                     // Add field to struct
                     fields.push(json!({
                         "name": field_name_snake,
                         "type": rust_type,
                         "is_optional": false
                     }));
-                    
+
                     // Add getter
                     getters.push(json!({
                         "name": field_name_snake,
@@ -426,7 +456,7 @@ impl CodeGenerator {
                         "is_option": false,
                         "is_primitive": true
                     }));
-                    
+
                     // Add initializer for from_entity
                     field_initializers.push(json!({
                         "name": field_name_snake,
@@ -436,29 +466,33 @@ impl CodeGenerator {
                         "is_api": false
                     }));
                 }
-                
+
                 // Process entity children
                 for &child_id in &ent.children {
                     if let Some(child) = self.model.get_node(child_id) {
                         let child_b = child.borrow();
                         if let ConfigNode::Entity(child_ent) = &*child_b {
-                            let (field_name, field_type) = if let Some(plural) = &child_ent.plural_name {
-                                // If plural, use plural name for field and plural type
-                                (self.field_name(plural), self.struct_name(plural))
-                            } else {
-                                (self.field_name(&child_ent.name), self.struct_name(&child_ent.name))
-                            };
-                            
+                            let (field_name, field_type) =
+                                if let Some(plural) = &child_ent.plural_name {
+                                    // If plural, use plural name for field and plural type
+                                    (self.field_name(plural), self.struct_name(plural))
+                                } else {
+                                    (
+                                        self.field_name(&child_ent.name),
+                                        self.struct_name(&child_ent.name),
+                                    )
+                                };
+
                             let original_name = child_ent.name.clone();
                             let is_api = field_type == "Api";
-                            
+
                             // Add field to struct (Api fields are optional)
                             fields.push(json!({
                                 "name": field_name,
                                 "type": field_type,
                                 "is_optional": is_api
                             }));
-                            
+
                             // Add getter
                             getters.push(json!({
                                 "name": field_name,
@@ -467,7 +501,7 @@ impl CodeGenerator {
                                 "is_option": is_api,
                                 "is_primitive": false
                             }));
-                            
+
                             // Add initializer for from_entity
                             field_initializers.push(json!({
                                 "name": field_name,
@@ -479,7 +513,7 @@ impl CodeGenerator {
                         }
                     }
                 }
-                
+
                 // Prepare template data
                 let template_data = json!({
                     "struct_name": struct_name,
@@ -487,18 +521,25 @@ impl CodeGenerator {
                     "getters": getters,
                     "field_initializers": field_initializers
                 });
-                
+
                 // Render the template
-                let struct_content = self.handlebars.render("singular_struct", &template_data)
+                let struct_content = self
+                    .handlebars
+                    .render("singular_struct", &template_data)
                     .expect("Failed to render singular_struct template");
-                
+
                 out.push_str(&struct_content);
             }
         }
     }
-    
+
     /// Emit all entity structs recursively
-    fn emit_all_entities(&mut self, node_id: usize, struct_names: &HashMap<usize, String>, out: &mut String) {
+    fn emit_all_entities(
+        &mut self,
+        node_id: usize,
+        struct_names: &HashMap<usize, String>,
+        out: &mut String,
+    ) {
         // Skip generating structs for instances of plural entities
         if !self.plural_instances.contains(&node_id) {
             // Emit this entity
@@ -543,7 +584,13 @@ impl CodeGenerator {
     }
 
     /// Emit a struct definition for an entity and its children
-    fn emit_entity(&mut self, node_id: usize, indent_level: usize, _struct_names: &HashMap<usize, String>, out: &mut String) {
+    fn emit_entity(
+        &mut self,
+        node_id: usize,
+        indent_level: usize,
+        _struct_names: &HashMap<usize, String>,
+        out: &mut String,
+    ) {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
 
@@ -556,23 +603,25 @@ impl CodeGenerator {
                         // Generate the collection wrapper struct
                         let collection_struct_name = self.struct_name(plural_name);
                         let singular_struct_name = self.struct_name(&ent.name);
-                        
+
                         // Skip if we already emitted this wrapper struct
                         if self.emitted_structs.contains(&collection_struct_name) {
                             return;
                         }
                         self.emitted_structs.insert(collection_struct_name.clone());
-                        
+
                         // Prepare the template data
                         let template_data = json!({
                             "struct_name": collection_struct_name,
                             "singular_struct_name": singular_struct_name
                         });
-                        
+
                         // Render the template
-                        let struct_content = self.handlebars.render("plural_struct", &template_data)
+                        let struct_content = self
+                            .handlebars
+                            .render("plural_struct", &template_data)
                             .expect("Failed to render plural_struct template");
-                        
+
                         // Add indentation if needed
                         if indent_level > 0 {
                             let indent = "    ".repeat(indent_level);
@@ -584,26 +633,28 @@ impl CodeGenerator {
                         } else {
                             out.push_str(&struct_content);
                         }
-                        
+
                         return;
                     }
-                    
+
                     // For regular entities or singular entities of plural collections
                     let struct_name = self.struct_name(&ent.name);
                     if self.emitted_structs.contains(&struct_name) {
                         return;
                     }
                     self.emitted_structs.insert(struct_name.clone());
-                    
+
                     // Special case for Api struct - use dedicated template
                     if struct_name == "Api" {
                         // Use the api_struct template
                         let template_data = json!({});
-                        
+
                         // Render the template
-                        let struct_content = self.handlebars.render("api_struct", &template_data)
+                        let struct_content = self
+                            .handlebars
+                            .render("api_struct", &template_data)
                             .expect("Failed to render api_struct template");
-                        
+
                         // Add indentation if needed
                         if indent_level > 0 {
                             let indent = "    ".repeat(indent_level);
@@ -615,20 +666,20 @@ impl CodeGenerator {
                         } else {
                             out.push_str(&struct_content);
                         }
-                        
+
                         return;
                     }
-                    
+
                     // For regular entity structs, use entity_struct.hbs template
-                    
+
                     // Collect field information for the template
                     let mut fields = Vec::new();
-                    
+
                     // Process primitive fields from the entity's fields map
                     for (field_name, field_value) in &ent.fields {
                         let field_name_snake = self.field_name(field_name);
                         let original_name = field_name.clone();
-                        
+
                         // Determine the Rust type for this field
                         let rust_type = match field_value {
                             ConfigValue::Integer(_) => "i64".to_string(),
@@ -636,7 +687,7 @@ impl CodeGenerator {
                             ConfigValue::Boolean(_) => "bool".to_string(),
                             ConfigValue::String(_) => "String".to_string(),
                         };
-                        
+
                         fields.push(json!({
                             "name": field_name_snake,
                             "type": rust_type,
@@ -644,22 +695,27 @@ impl CodeGenerator {
                             "optional": false
                         }));
                     }
-                    
+
                     // Process entity children as fields (relationships)
                     for child_id in ent.children.clone() {
                         if let Some(child_node) = self.model.get_node(child_id) {
                             let child_node_b = child_node.borrow();
                             if let ConfigNode::Entity(child_ent) = &*child_node_b {
-                                let (field_name, field_type, is_plural) = if let Some(plural) = &child_ent.plural_name {
-                                    // If plural, use plural name for field and plural type
-                                    (self.field_name(plural), self.struct_name(plural), true)
-                                } else {
-                                    (self.field_name(&child_ent.name), self.struct_name(&child_ent.name), false)
-                                };
-                                
+                                let (field_name, field_type, is_plural) =
+                                    if let Some(plural) = &child_ent.plural_name {
+                                        // If plural, use plural name for field and plural type
+                                        (self.field_name(plural), self.struct_name(plural), true)
+                                    } else {
+                                        (
+                                            self.field_name(&child_ent.name),
+                                            self.struct_name(&child_ent.name),
+                                            false,
+                                        )
+                                    };
+
                                 let original_name = self.to_original_case(&field_name);
                                 let is_api = field_type == "Api";
-                                
+
                                 fields.push(json!({
                                     "name": field_name,
                                     "type": field_type,
@@ -672,18 +728,20 @@ impl CodeGenerator {
                             }
                         }
                     }
-                    
+
                     // Prepare the template data
                     let template_data = json!({
                         "struct_name": struct_name,
                         "fields": fields,
                         "model_import": "colap::model::config_model"
                     });
-                    
+
                     // Render the template
-                    let struct_content = self.handlebars.render("entity_struct", &template_data)
+                    let struct_content = self
+                        .handlebars
+                        .render("entity_struct", &template_data)
                         .expect("Failed to render entity_struct template");
-                    
+
                     // Add indentation if needed
                     if indent_level > 0 {
                         let indent = "    ".repeat(indent_level);
@@ -695,8 +753,8 @@ impl CodeGenerator {
                     } else {
                         out.push_str(&struct_content);
                     }
-                },
-                ConfigNode::Field(_) => {},
+                }
+                ConfigNode::Field(_) => {}
             }
         }
     }
@@ -725,7 +783,7 @@ impl CodeGenerator {
             name.to_snake_case()
         }
     }
-    
+
     /// Convert back to original case for field lookups
     fn to_original_case(&self, name: &str) -> String {
         if name == "type_" {
@@ -742,8 +800,6 @@ impl CodeGenerator {
             out.push_str("    ");
         }
     }
-
-
 
     /// Get a relative path to the source file for inclusion in tests
     fn relative_source_path(&self) -> String {

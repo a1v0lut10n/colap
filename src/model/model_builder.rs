@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+use crate::model::config_model::{ConfigModel, ConfigValue};
+use crate::model::source_location::SourceLocation;
 use crate::parser::cola_actions::{
     CodeBlock, Cola, Entity, FieldList, FieldValue, MarkdownItem, NestedBlock,
 };
-use crate::model::config_model::{ConfigModel, ConfigValue};
-use crate::model::source_location::SourceLocation;
 use std::path::PathBuf;
 
 /// Builds a ConfigModel from a parsed Cola AST
@@ -63,7 +63,7 @@ impl ModelBuilder {
                         rustemo::Position::LineBased(lc) => (lc.line, lc.column),
                         rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
                     };
-                    
+
                     // Extract end position (line, column) if available
                     let (end_line, end_column) = if let Some(end) = &loc.end {
                         match end {
@@ -73,7 +73,7 @@ impl ModelBuilder {
                     } else {
                         (start_line, start_column) // Default to start position if end is not available
                     };
-                    
+
                     SourceLocation {
                         file_path: PathBuf::new(), // We may not have a file path in the Location
                         start_line: start_line as u32,
@@ -122,7 +122,7 @@ impl ModelBuilder {
                         rustemo::Position::LineBased(lc) => (lc.line, lc.column),
                         rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
                     };
-                    
+
                     // Extract end position (line, column) if available
                     let (end_line, end_column) = if let Some(end) = &loc.end {
                         match end {
@@ -132,7 +132,7 @@ impl ModelBuilder {
                     } else {
                         (start_line, start_column) // Default to start position if end is not available
                     };
-                    
+
                     SourceLocation {
                         file_path: PathBuf::new(), // We may not have a file path in the Location
                         start_line: start_line as u32,
@@ -216,7 +216,7 @@ impl ModelBuilder {
         let field_name = match id.as_ref() {
             s => s.trim().to_string(),
         };
-        
+
         // Extract source location from the field
         let location = field.location.as_ref().map(|loc| {
             // Convert rustemo Location to our SourceLocation
@@ -225,7 +225,7 @@ impl ModelBuilder {
                 rustemo::Position::LineBased(lc) => (lc.line, lc.column),
                 rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
             };
-            
+
             // Extract end position (line, column) if available
             let (end_line, end_column) = if let Some(end) = &loc.end {
                 match end {
@@ -235,7 +235,7 @@ impl ModelBuilder {
             } else {
                 (start_line, start_column) // Default to start position if end is not available
             };
-            
+
             SourceLocation {
                 file_path: PathBuf::new(), // We may not have a file path in the Location
                 start_line: start_line as u32,
@@ -244,13 +244,13 @@ impl ModelBuilder {
                 end_column: end_column as u32,
             }
         });
-        
+
         // Pass field_value to be converted
         let field_value = Self::convert_field_value(&field.field_value)?;
-        
+
         // Add field with source location to the entity
         model.add_field_with_location(entity_id, &field_name, field_value, location)?;
-        
+
         Ok(())
     }
 

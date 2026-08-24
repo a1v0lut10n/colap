@@ -210,7 +210,7 @@ impl ConfigModel {
             Err(format!("Node with ID {} is not an entity", entity_id))
         }
     }
-    
+
     /// Add a field to an entity with source location
     pub fn add_field_with_location(
         &mut self,
@@ -221,13 +221,13 @@ impl ConfigModel {
     ) -> Result<(), String> {
         // First, add the field value to the entity's fields map for direct lookup
         self.add_field_to_entity(entity_id, field_name, value.clone())?;
-        
+
         // Create a field node with the location
         let field_node = ConfigNode::new_field(field_name, value, location);
-        
+
         // Add the field node to the model
         let field_id = self.add_node(field_node);
-        
+
         // Add the field as a child of the entity
         self.add_child(entity_id, field_id)
     }
@@ -324,7 +324,7 @@ impl ConfigModel {
     pub fn find_child_entity_by_name(&self, parent_id: NodeId, child_name: &str) -> Option<NodeId> {
         let parent_node = self.get_node(parent_id)?;
         let parent_borrow = parent_node.borrow();
-        
+
         if let ConfigNode::Entity(parent_entity) = &*parent_borrow {
             for &child_id in &parent_entity.children {
                 if let Some(child_node) = self.get_node(child_id) {

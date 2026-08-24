@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-use rustemo::Parser;
 use colap::cola::ColaParser;
 use colap::config_model::ConfigValue;
 use colap::model_builder::ModelBuilder;
+use rustemo::Parser;
 use std::fs;
 use std::path::Path;
 
