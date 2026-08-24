@@ -67,6 +67,19 @@ fn main() {
         exit(1);
     }
 
+    // The generated files are committed in-tree, and every build
+    // regenerates them — unformatted. Format them here (best effort:
+    // rustfmt may be absent on a minimal toolchain) so the working
+    // tree stays stable and `cargo fmt --all -- --check` holds.
+    let _ = std::process::Command::new("rustfmt")
+        .args([
+            "--edition",
+            "2024",
+            "src/parser/cola.rs",
+            "src/parser/cola_actions.rs",
+        ])
+        .status();
+
     // Clean up the original files
     if let Err(e) = fs::remove_file(Path::new("src/cola.rs")) {
         eprintln!("Failed to remove src/cola.rs: {e}");
