@@ -1,8 +1,8 @@
-use super::cola::{Context, TokenKind};
-use rustemo::Token as RustemoToken;
 /// This file is maintained by rustemo but can be modified manually.
 /// All manual changes will be preserved except non-doc comments.
-use rustemo::{Context as C, ValLoc};
+use rustemo::{ValLoc, Context as C};
+use rustemo::Token as RustemoToken;
+use super::cola::{TokenKind, Context};
 pub type Input = str;
 pub type Ctx<'i> = Context<'i, Input>;
 #[allow(dead_code)]
@@ -68,11 +68,17 @@ pub fn markdown_item1_c1(
     markdown_item1.push(markdown_item);
     markdown_item1
 }
-pub fn markdown_item1_markdown_item(_ctx: &Ctx, markdown_item: MarkdownItem) -> MarkdownItem1 {
+pub fn markdown_item1_markdown_item(
+    _ctx: &Ctx,
+    markdown_item: MarkdownItem,
+) -> MarkdownItem1 {
     vec![markdown_item]
 }
 pub type MarkdownItem0 = Option<MarkdownItem1>;
-pub fn markdown_item0_markdown_item1(_ctx: &Ctx, markdown_item1: MarkdownItem1) -> MarkdownItem0 {
+pub fn markdown_item0_markdown_item1(
+    _ctx: &Ctx,
+    markdown_item1: MarkdownItem1,
+) -> MarkdownItem0 {
     Some(markdown_item1)
 }
 pub fn markdown_item0_empty(_ctx: &Ctx) -> MarkdownItem0 {
@@ -84,13 +90,19 @@ pub enum MarkdownItem {
     CodeBlock(CodeBlock),
     ParagraphLine(ParagraphLine),
 }
-pub fn markdown_item_heading_line(_ctx: &Ctx, heading_line: HeadingLine) -> MarkdownItem {
+pub fn markdown_item_heading_line(
+    _ctx: &Ctx,
+    heading_line: HeadingLine,
+) -> MarkdownItem {
     MarkdownItem::HeadingLine(heading_line)
 }
 pub fn markdown_item_code_block(_ctx: &Ctx, code_block: CodeBlock) -> MarkdownItem {
     MarkdownItem::CodeBlock(code_block)
 }
-pub fn markdown_item_paragraph_line(_ctx: &Ctx, paragraph_line: ParagraphLine) -> MarkdownItem {
+pub fn markdown_item_paragraph_line(
+    _ctx: &Ctx,
+    paragraph_line: ParagraphLine,
+) -> MarkdownItem {
     MarkdownItem::ParagraphLine(paragraph_line)
 }
 #[derive(Debug, Clone)]
@@ -98,7 +110,10 @@ pub enum CodeBlock {
     ColaCodeBlock(ColaCodeBlock),
     RegularCodeBlock(RegularCodeBlock),
 }
-pub fn code_block_cola_code_block(_ctx: &Ctx, cola_code_block: ColaCodeBlock) -> CodeBlock {
+pub fn code_block_cola_code_block(
+    _ctx: &Ctx,
+    cola_code_block: ColaCodeBlock,
+) -> CodeBlock {
     CodeBlock::ColaCodeBlock(cola_code_block)
 }
 pub fn code_block_regular_code_block(
@@ -216,11 +231,17 @@ pub fn nested_block1_c1(
     nested_block1.push(nested_block);
     nested_block1
 }
-pub fn nested_block1_nested_block(_ctx: &Ctx, nested_block: NestedBlock) -> NestedBlock1 {
+pub fn nested_block1_nested_block(
+    _ctx: &Ctx,
+    nested_block: NestedBlock,
+) -> NestedBlock1 {
     vec![nested_block]
 }
 pub type NestedBlock0 = Option<NestedBlock1>;
-pub fn nested_block0_nested_block1(_ctx: &Ctx, nested_block1: NestedBlock1) -> NestedBlock0 {
+pub fn nested_block0_nested_block1(
+    _ctx: &Ctx,
+    nested_block1: NestedBlock1,
+) -> NestedBlock0 {
     Some(nested_block1)
 }
 pub fn nested_block0_empty(_ctx: &Ctx) -> NestedBlock0 {
@@ -252,13 +273,15 @@ pub fn field_list_field(_ctx: &Ctx, field: Field) -> FieldList {
     FieldList::Field(field)
 }
 pub fn field_list_c2(_ctx: &Ctx, field_list: FieldList, field: Field) -> FieldList {
-    FieldList::C2(FieldListC2::new(
-        FieldListC2Base {
-            field_list: Box::new(field_list),
-            field,
-        },
-        Some(_ctx.location()),
-    ))
+    FieldList::C2(
+        FieldListC2::new(
+            FieldListC2Base {
+                field_list: Box::new(field_list),
+                field,
+            },
+            Some(_ctx.location()),
+        ),
+    )
 }
 #[derive(Debug, Clone)]
 pub struct FieldBase {
