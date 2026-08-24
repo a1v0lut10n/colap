@@ -273,11 +273,7 @@ impl ConfigModel {
                 }
             };
 
-            if let Some(next_id) = found {
-                current_id = next_id;
-            } else {
-                return None;
-            }
+            current_id = found?;
         }
 
         Some(current_id)
