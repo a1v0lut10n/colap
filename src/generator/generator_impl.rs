@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use chrono::Local;
@@ -94,10 +94,10 @@ impl CodeGenerator {
     /// Generate a single module file
     fn generate_module(&mut self, output_file: PathBuf) -> Result<()> {
         // Create the output directory if it doesn't exist
-        if let Some(parent) = output_file.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?
-            }
+        if let Some(parent) = output_file.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?
         }
 
         let mut out = String::new();
@@ -205,7 +205,7 @@ impl CodeGenerator {
             if !line.trim().is_empty() {
                 out.push_str("    ");
                 out.push_str(line);
-                out.push_str("\n");
+                out.push('\n');
             }
         }
 
@@ -214,7 +214,7 @@ impl CodeGenerator {
     }
 
     /// Generate Cargo.toml for the crate
-    fn generate_cargo_toml(&self, output_dir: &PathBuf, crate_name: &str) -> Result<()> {
+    fn generate_cargo_toml(&self, output_dir: &Path, crate_name: &str) -> Result<()> {
         // Figure out the relative path to colap crate from the output directory
         // This is a simplified approach; in a real-world scenario, you might need a more robust solution
         let colap_path = "../colap".to_string();
@@ -236,7 +236,7 @@ impl CodeGenerator {
     }
 
     /// Generate integration tests for the crate
-    fn generate_crate_tests(&self, output_dir: &PathBuf) -> Result<()> {
+    fn generate_crate_tests(&self, output_dir: &Path) -> Result<()> {
         let tests_dir = output_dir.join("tests");
 
         // Create tests directory if it doesn't exist
@@ -280,7 +280,7 @@ impl CodeGenerator {
     }
 
     /// Copy the input configuration file to the tests/data directory
-    fn copy_config_to_tests_data(&self, output_dir: &PathBuf) -> Result<()> {
+    fn copy_config_to_tests_data(&self, output_dir: &Path) -> Result<()> {
         // Create tests/data directory
         let tests_data_dir = output_dir.join("tests").join("data");
         fs::create_dir_all(&tests_data_dir)?;
@@ -306,7 +306,7 @@ impl CodeGenerator {
     }
 
     /// Generate README.md for the crate
-    fn generate_readme(&self, output_dir: &PathBuf, crate_name: &str) -> Result<()> {
+    fn generate_readme(&self, output_dir: &Path, crate_name: &str) -> Result<()> {
         // Extract the config filename from the source path
         let config_filename = self
             .source_path
@@ -628,7 +628,7 @@ impl CodeGenerator {
                             for line in struct_content.lines() {
                                 out.push_str(&indent);
                                 out.push_str(line);
-                                out.push_str("\n");
+                                out.push('\n');
                             }
                         } else {
                             out.push_str(&struct_content);
@@ -661,7 +661,7 @@ impl CodeGenerator {
                             for line in struct_content.lines() {
                                 out.push_str(&indent);
                                 out.push_str(line);
-                                out.push_str("\n");
+                                out.push('\n');
                             }
                         } else {
                             out.push_str(&struct_content);
@@ -748,7 +748,7 @@ impl CodeGenerator {
                         for line in struct_content.lines() {
                             out.push_str(&indent);
                             out.push_str(line);
-                            out.push_str("\n");
+                            out.push('\n');
                         }
                     } else {
                         out.push_str(&struct_content);

@@ -23,22 +23,23 @@ fn main() {
 
     // Clean up any existing files
     for path in actions_paths.iter().chain(cola_paths.iter()) {
-        if path.exists() {
-            if let Err(e) = fs::remove_file(path) {
-                eprintln!("Failed to delete {}: {e}", path.display());
-                exit(1);
-            }
+        if path.exists()
+            && let Err(e) = fs::remove_file(path)
+        {
+            eprintln!("Failed to delete {}: {e}", path.display());
+            exit(1);
         }
     }
 
     // Make sure src/cola.rustemo exists by copying from src/grammar if needed
     let grammar_src = Path::new("src/grammar/cola.rustemo");
     let grammar_dest = Path::new("src/cola.rustemo");
-    if !grammar_dest.exists() && grammar_src.exists() {
-        if let Err(e) = fs::copy(grammar_src, grammar_dest) {
-            eprintln!("Failed to copy grammar file: {e}");
-            exit(1);
-        }
+    if !grammar_dest.exists()
+        && grammar_src.exists()
+        && let Err(e) = fs::copy(grammar_src, grammar_dest)
+    {
+        eprintln!("Failed to copy grammar file: {e}");
+        exit(1);
     }
 
     let mut settings = rustemo_compiler::Settings::new();
@@ -65,6 +66,19 @@ fn main() {
         eprintln!("Failed to move cola_actions.rs: {e}");
         exit(1);
     }
+
+    // The generated files are committed in-tree, and every build
+    // regenerates them — unformatted. Format them here (best effort:
+    // rustfmt may be absent on a minimal toolchain) so the working
+    // tree stays stable and `cargo fmt --all -- --check` holds.
+    let _ = std::process::Command::new("rustfmt")
+        .args([
+            "--edition",
+            "2024",
+            "src/parser/cola.rs",
+            "src/parser/cola_actions.rs",
+        ])
+        .status();
 
     // Clean up the original files
     if let Err(e) = fs::remove_file(Path::new("src/cola.rs")) {

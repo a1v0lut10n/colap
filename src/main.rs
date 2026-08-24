@@ -132,7 +132,7 @@ fn generate(
                 output_file: module_file,
             }
         }
-        "crate" | _ => {
+        _ => {
             // Default to crate mode
             GenerationMode::Crate {
                 output_dir: output_dir.clone(),

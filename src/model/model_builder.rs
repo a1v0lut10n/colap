@@ -17,15 +17,13 @@ impl ModelBuilder {
 
         if let Some(markdown_items) = cola {
             for markdown_item in markdown_items {
-                match markdown_item {
-                    MarkdownItem::CodeBlock(CodeBlock::ColaCodeBlock(cola_block)) => {
-                        if let Some(entities) = &cola_block.cola_syntax {
-                            for entity in entities {
-                                Self::process_entity(&mut model, root_id, "", entity)?;
-                            }
-                        }
+                // Ignore non-cola code blocks, headings, paragraphs.
+                if let MarkdownItem::CodeBlock(CodeBlock::ColaCodeBlock(cola_block)) = markdown_item
+                    && let Some(entities) = &cola_block.cola_syntax
+                {
+                    for entity in entities {
+                        Self::process_entity(&mut model, root_id, "", entity)?;
                     }
-                    _ => {} // Ignore non-cola code blocks, headings, paragraphs
                 }
             }
         }
@@ -46,9 +44,7 @@ impl ModelBuilder {
                 // We need to handle this differently since we can't directly access ValLoc fields
                 let identifier = &singular.identifier;
                 // Extract the string value
-                let entity_name = match identifier.as_ref() {
-                    s => s.trim(), // Trim the string
-                };
+                let entity_name = identifier.as_ref().trim();
                 let path = if parent_path.is_empty() {
                     entity_name.to_string()
                 } else {
@@ -102,12 +98,8 @@ impl ModelBuilder {
                 let id1 = &plural.identifier_1;
                 let id3 = &plural.identifier_3;
                 // Extract string values
-                let entity_name = match id1.as_ref() {
-                    s => s.trim(),
-                };
-                let plural_name = match id3.as_ref() {
-                    s => s.trim(),
-                };
+                let entity_name = id1.as_ref().trim();
+                let plural_name = id3.as_ref().trim();
                 let path = if parent_path.is_empty() {
                     entity_name.to_string()
                 } else {
@@ -213,9 +205,7 @@ impl ModelBuilder {
     ) -> Result<(), String> {
         // Extract field name from identifier
         let id = &field.identifier;
-        let field_name = match id.as_ref() {
-            s => s.trim().to_string(),
-        };
+        let field_name = id.as_ref().trim().to_string();
 
         // Extract source location from the field
         let location = field.location.as_ref().map(|loc| {
@@ -259,24 +249,18 @@ impl ModelBuilder {
         match field_value {
             FieldValue::QuotedStringDouble(s) => {
                 // Extract string and remove surrounding quotes
-                let s_val = match s.as_ref() {
-                    s => s.trim(),
-                };
+                let s_val = s.as_ref().trim();
                 let content = s_val[1..s_val.len() - 1].to_string();
                 Ok(ConfigValue::String(content))
             }
             FieldValue::QuotedStringSingle(s) => {
                 // Extract string and remove surrounding quotes
-                let s_val = match s.as_ref() {
-                    s => s.trim(),
-                };
+                let s_val = s.as_ref().trim();
                 let content = s_val[1..s_val.len() - 1].to_string();
                 Ok(ConfigValue::String(content))
             }
             FieldValue::Number(n) => {
-                let n_str = match n.as_ref() {
-                    s => s.trim(),
-                };
+                let n_str = n.as_ref().trim();
                 if n_str.contains('.') {
                     // Float value
                     match n_str.parse::<f64>() {
