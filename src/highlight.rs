@@ -122,7 +122,9 @@ fn cola_tokens(line: &str) -> Vec<Token> {
         }
         if c.is_ascii_alphabetic() || c == b'_' {
             let start = i;
-            while i < b.len() && (b[i].is_ascii_alphanumeric() || matches!(b[i], b'_' | b'.' | b'-')) {
+            while i < b.len()
+                && (b[i].is_ascii_alphanumeric() || matches!(b[i], b'_' | b'.' | b'-'))
+            {
                 i += 1;
             }
             let word = &line[start..i];
@@ -131,10 +133,15 @@ fn cola_tokens(line: &str) -> Vec<Token> {
                 "true" | "false" => TokenKind::Boolean,
                 _ => TokenKind::Identifier,
             };
-            out.push(Token { range: start..i, kind });
+            out.push(Token {
+                range: start..i,
+                kind,
+            });
             continue;
         }
-        if c.is_ascii_digit() || ((c == b'+' || c == b'-') && b.get(i + 1).is_some_and(u8::is_ascii_digit)) {
+        if c.is_ascii_digit()
+            || ((c == b'+' || c == b'-') && b.get(i + 1).is_some_and(u8::is_ascii_digit))
+        {
             let start = i;
             i += 1;
             while i < b.len() && b[i].is_ascii_digit() {
