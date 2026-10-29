@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: planned
+status: done
 affects:
   - README.md
 tags: [model, semantics, diagnostics, bug]
@@ -45,8 +45,8 @@ these cases.
 
 ## Deliverables
 
-1. **A short design record** (`docs/decisions/ADR-NNN-duplicate-keys.md`) choosing the
-   semantics. Recommended:
+1. **A short design record** (`docs/design/2026-10-29-duplicate-key-semantics.md`)
+   choosing the semantics. Recommended:
    - **Fields.** A duplicate field name within one entity is an error.
    - **Plural entries.** A duplicate entry key within the same plural is an error, both
      within one block and across blocks.

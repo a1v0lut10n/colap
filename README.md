@@ -402,6 +402,49 @@ Files named `.md` or `.markdown` are always read as literate documents; any
 other file is read as literate when it contains a cola fence and as bare
 cola otherwise.
 
+### 🔁 Reopening and duplicates
+
+A name directly under a `plural` header is a **key**: it identifies an
+entry. Every other entity name is a **slot**: it names a place in the
+configuration. The rules follow that line.
+
+- **Slots may be reopened.** The same declaration at the same path continues
+  the same entity, so a collection can be written in batches with prose
+  between them, and a section can be split by narrative:
+
+  ```cola
+  claim plural claims:
+      cl-1: subject: "a";
+  ;
+  ```
+
+  Some prose, then more entries of the same collection:
+
+  ```cola
+  claim plural claims:
+      cl-2: subject: "b";
+  ;
+  ```
+
+  Reopening a slot with a different declaration — another plural name, or
+  singular where it was plural — is an error.
+- **Keys are defined once.** A second `cl-1` under `claims`, in the same block
+  or a later one, is an error. That also means a key cannot be reopened to
+  batch a nested collection under it: entries of `llm/openai/models` are
+  written in one block.
+- **Fields are set once**, and an entity has one namespace: a name is a field
+  or an entity, never both, and `model plural models` reserves both `model`
+  and `models` in its parent.
+
+Every duplicate is reported, not just the first, with both locations:
+
+```text
+ledger.md:21:5: duplicate entry `cl-1` in `claim`; first at 18:5
+```
+
+The design record `docs/design/2026-10-29-duplicate-key-semantics.md` has
+the reasoning.
+
 ---
 
 ## 📜 License

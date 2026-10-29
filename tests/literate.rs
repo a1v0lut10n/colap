@@ -4,7 +4,7 @@
 //! highlighter agreeing with the scanner. Fixtures live under
 //! `tests/data/literate/`; the reproductions come from the 2026-10-29
 //! field-test tasks.
-use colap::config_model::{ConfigNode, ConfigValue};
+use colap::config_model::ConfigValue;
 use colap::highlight::{LineState, line_tokens};
 use colap::literate::{Warning, scan};
 use colap::{ConfigModel, Error, Parsed};
@@ -22,16 +22,10 @@ fn parse(name: &str) -> Parsed {
 fn top_level_names(model: &ConfigModel) -> Vec<String> {
     let root = model.get_node(model.root_id()).expect("root");
     let root = root.borrow();
-    let ConfigNode::Entity(root) = &*root else {
-        panic!("root is not an entity")
-    };
     root.children
         .iter()
         .filter_map(|&id| model.get_node(id))
-        .filter_map(|n| match &*n.borrow() {
-            ConfigNode::Entity(e) => Some(e.name.clone()),
-            ConfigNode::Field(_) => None,
-        })
+        .map(|n| n.borrow().name.clone())
         .collect()
 }
 
@@ -103,23 +97,15 @@ fn locations_point_into_the_original_file() {
     let parsed = parse("foreign-fences.md");
     let b = parsed.model.find_entity_by_path("b").expect("b");
     let node = parsed.model.get_node(b).expect("node");
-    let node = node.borrow();
-    let ConfigNode::Entity(b) = &*node else {
-        panic!("b is not an entity")
-    };
+    let b = node.borrow();
     let loc = b.location.as_ref().expect("entity location");
     assert_eq!(loc.file_path, path);
     assert_eq!(loc.start_line, 29, "`b:` is on line 29 of the file");
 
-    // Field nodes carry their own location.
+    // Fields carry their own location.
     let y = b
-        .children
-        .iter()
-        .filter_map(|&id| parsed.model.get_node(id))
-        .find_map(|n| match &*n.borrow() {
-            ConfigNode::Field(f) if f.name == "y" => f.location.clone(),
-            _ => None,
-        })
+        .field("y")
+        .and_then(|f| f.location.clone())
         .expect("field y location");
     assert_eq!((y.start_line, y.start_column), (30, 4));
 }

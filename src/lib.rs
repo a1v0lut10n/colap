@@ -6,7 +6,8 @@
 //! is markdown whose ```` ```cola ```` fences carry configuration
 //! ([`literate`] finds them); a bare file is cola from the first byte.
 //! Both give a [`ConfigModel`] whose locations point into the original
-//! file, plus the scanner's [`literate::Warning`]s.
+//! file, plus the scanner's [`literate::Warning`]s. Every error in the
+//! file is reported, not only the first: see [`Error::Multiple`].
 //!
 //! The rustemo-generated parser stays reachable under [`parser`] for
 //! callers that want the raw AST of one cola block, and [`rustemo`] is
@@ -49,13 +50,15 @@ pub fn parse_literate_str(text: &str, path: Option<&Path>) -> Result<Parsed, Err
     let mut builder = ModelBuilder::new(path);
     for block in scan.cola_blocks() {
         let line_offset = block.body_line() - 1;
-        let ast = cola::ColaParser::new()
-            .parse(&block.body)
-            .map_err(|e| Error::from_rustemo(e, path, line_offset))?;
-        builder.add_block(&ast, line_offset)?;
+        // A block that does not parse is recorded and the next one is
+        // still read, so one bad block does not hide the rest.
+        match cola::ColaParser::new().parse(&block.body) {
+            Ok(ast) => builder.add_block(&ast, line_offset),
+            Err(e) => builder.record(Error::from_rustemo(e, path, line_offset)),
+        }
     }
     Ok(Parsed {
-        model: builder.finish(),
+        model: builder.finish()?,
         warnings: scan.warnings,
     })
 }
@@ -66,9 +69,9 @@ pub fn parse_cola_str(text: &str, path: Option<&Path>) -> Result<Parsed, Error> 
         .parse(text)
         .map_err(|e| Error::from_rustemo(e, path, 0))?;
     let mut builder = ModelBuilder::new(path);
-    builder.add_block(&ast, 0)?;
+    builder.add_block(&ast, 0);
     Ok(Parsed {
-        model: builder.finish(),
+        model: builder.finish()?,
         warnings: Vec::new(),
     })
 }

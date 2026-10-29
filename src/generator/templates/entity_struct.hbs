@@ -22,11 +22,11 @@ impl {{struct_name}} {
         // Process primitive fields
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let {{model_import}}::ConfigNode::Entity(ent) = &*node_b {
+            {
                 // Initialize primitive fields
                 {{#each fields}}
                 {{#unless is_entity}}
-                if let Some(val) = ent.fields.get("{{original_name}}") {
+                if let Some(val) = node_b.field_value("{{original_name}}") {
                     {{#if (eq type "String")}}
                     if let {{model_import}}::ConfigValue::String(s) = val {
                         result.{{name}} = s.clone();
