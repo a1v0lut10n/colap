@@ -281,6 +281,11 @@ impl ConfigModel {
         self.root_id
     }
 
+    /// Every node id, root first, in creation order.
+    pub fn node_ids(&self) -> std::ops::Range<NodeId> {
+        0..self.nodes.len()
+    }
+
     /// The path of an entity from the root, singular names joined by `/`;
     /// empty for the root.
     pub fn entity_path(&self, id: NodeId) -> String {

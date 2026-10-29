@@ -2,7 +2,7 @@
 date: 2026-10-29
 type: task
 ticket: COLA-0003
-status: in-progress
+status: done
 affects:
   - README.md
   - src/main.rs
@@ -56,12 +56,28 @@ of the parse error that follows it, so the reading step has to return both.
 
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] `colap check` on every fixture under `tests/data/` gives the
-      expected exit code and lines.
-- [ ] `colap check --format cola` output round-trips through `parse_str`.
-- [ ] `aivolution lint .` clean; README updated; journal entry proposed.
+- [x] The three Rust gates are clean (65 tests; 10 new in `tests/cli.rs`,
+      2 in `diagnostic.rs`).
+- [x] `colap check` on the fixtures gives the expected exit codes and exact
+      lines, for errors, the three warnings, several files at once, a
+      missing file and a usage error.
+- [x] `colap check --format cola` output round-trips through `parse_str`.
+- [x] `aivolution lint .` clean; README updated; journal entry proposed.
 
 ## Outcome
 
-(filled in before the change proposal)
+Built as planned. Notes beyond the action items:
+
+- The trace is debug-build only in rustemo and gated by the
+  `RUSTEMO_NOTRACE` variable read on every call, so the CLI sets or clears
+  it in `main` before any thread exists (one `unsafe` with its invariant
+  stated). Library consumers' own debug builds still need the variable
+  until rustemo offers a runtime switch; release builds are silent.
+- Warnings survive errors: `Report` carries both, and `generate` prints
+  the same diagnostics to stderr before exiting 1.
+- `Report::diagnostics()` sorts errors and warnings together by line;
+  findings without a location (no cola blocks, unreadable file) come
+  first.
+- The cola rendering uses synthetic keys `f1`, `f2`, … under
+  `finding plural findings` because the value language has no lists
+  yet; the value-language task may revisit that.

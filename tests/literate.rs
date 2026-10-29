@@ -83,10 +83,10 @@ fn unterminated_fence_warns_and_still_parses() {
     let parsed = parse("unterminated.md");
     assert_eq!(
         parsed.warnings,
-        vec![Warning::UnterminatedFence {
+        vec![colap::Warning::Fence(Warning::UnterminatedFence {
             line: 3,
             lang: "cola".into()
-        }]
+        })]
     );
     assert_eq!(top_level_names(&parsed.model), ["u"]);
 }
@@ -147,7 +147,7 @@ fn markdown_without_cola_is_empty_when_literate_and_an_error_when_detected() {
     let text = std::fs::read_to_string(fixture("no-cola.md")).unwrap();
     let parsed = colap::parse_literate_str(&text, None).expect("literate parse");
     assert!(top_level_names(&parsed.model).is_empty());
-    assert!(parsed.warnings.is_empty());
+    assert_eq!(parsed.warnings, vec![colap::Warning::NoColaBlocks]);
     // `.md` goes the literate way through parse_file, too.
     assert!(top_level_names(&parse("no-cola.md").model).is_empty());
     // Detection treats fence-less text as bare cola: prose is not cola.

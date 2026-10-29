@@ -78,10 +78,10 @@ impl ModelBuilder {
     /// Convert a single parsed block to a ConfigModel, with locations
     /// relative to that block. The incremental API above is the one to
     /// use for literate files; see also [`crate::parse_str`].
-    pub fn build_config_model(cola: &Cola) -> Result<ConfigModel, String> {
+    pub fn build_config_model(cola: &Cola) -> Result<ConfigModel, Error> {
         let mut builder = Self::new(None);
         builder.add_block(cola, 0);
-        builder.finish().map_err(|e| e.to_string())
+        builder.finish()
     }
 
     /// A rustemo location lifted to the file's coordinates.

@@ -181,20 +181,54 @@ The colap codebase is organized into the following modules:
 
 ```bash
 USAGE:
-    colap [OPTIONS] <input>
+    colap check [--format <text|cola>] <FILE>...
+    colap generate [OPTIONS] <input>
+    colap [OPTIONS] <input>              # the same as `generate`
 
-ARGS:
-    <input>    Input .cola file or markdown containing Cola code blocks
-
-OPTIONS:
-    -h, --help                     Print help information
+OPTIONS (generate):
     -m, --mode <MODE>              Generation mode: 'crate' or 'module' (default: crate)
     -n, --crate-name <NAME>        Name of the generated library crate (default: input-file-stem-config)
     -o, --output <DIR>             Base output directory (default: generated)
+
+OPTIONS (all commands):
+        --trace                    Print the parser's debug trace (debug builds only)
+    -h, --help                     Print help information
     -V, --version                  Print version information
 ```
 
+Exit codes are lint-style: **0** when every file is clean (warnings allowed),
+**1** when any error was found, **2** for a usage error.
+
 ### Examples
+
+#### Checking files
+
+Validate literate files without generating anything:
+
+```sh
+colap check docs/*.md
+```
+
+Every finding is one line, `path:line:col: severity: message`, with the
+location in the original file. All errors in a file are reported, not just
+the first: a block that does not parse does not hide the next one, and every
+duplicate is listed with both locations.
+
+```text
+ledger.md:12:8: error: Expected one of BooleanFalse, BooleanTrue, Semicolon, Identifier, Number, QuotedStringDouble, QuotedStringSingle.
+ledger.md:21:5: error: duplicate entry `cl-1` in `claim`; first at 18:5
+notes.md: warning: no cola blocks in this file
+notes.md:3:1: warning: unclosed cola fence runs to the end of the file
+config.md:5:5: warning: empty entity `llm/api`
+```
+
+`--format cola` prints the same findings as a cola block — a
+`finding plural findings` collection with `severity`, `path`, `line`,
+`column` and `message` fields — so a report can be fed back to colap or
+embedded in a literate document.
+
+The same checks run before every `generate`, which prints the findings to
+stderr and exits 1 on errors.
 
 #### Basic Crate Generation (Default)
 
