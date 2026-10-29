@@ -1,29 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-use colap::cola::ColaParser;
 use colap::config_model::ConfigValue;
-use colap::model_builder::ModelBuilder;
-use rustemo::Parser;
-use std::fs;
 use std::path::Path;
 
 #[test]
 fn test_model_builder_with_test_genite() {
-    // Parse the test file
+    // Parse the test file through the facade: scanner, parser, builder.
     let test_file = Path::new("tests/data/test_genite.md");
-    let content = fs::read_to_string(test_file).expect("Failed to read test file");
-
-    // Create a new parser and parse the content
-    let parser = ColaParser::new();
-    let parse_result = parser.parse(&content);
-    assert!(parse_result.is_ok(), "Failed to parse test file");
-
-    let ast = parse_result.unwrap();
-
-    // Use ModelBuilder to convert AST to ConfigModel
-    let model_result = ModelBuilder::build_config_model(&ast);
-    assert!(model_result.is_ok(), "Failed to build model from AST");
-
-    let model = model_result.unwrap();
+    let parsed = colap::parse_file(test_file).expect("Failed to parse test file");
+    assert!(
+        parsed.warnings.is_empty(),
+        "unexpected warnings: {:?}",
+        parsed.warnings
+    );
+    let model = parsed.model;
 
     // Verify the model structure by checking key entities and fields
     // First verify the model contains the llm entity

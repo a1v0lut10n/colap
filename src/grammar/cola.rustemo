@@ -1,12 +1,8 @@
-Cola: MarkdownItem*;
+// The cola language proper. Markdown is not this grammar's business:
+// `src/literate.rs` finds the fenced blocks and hands only the bodies
+// of the ```cola ones here, so prose outside fences is unconstrained.
 
-MarkdownItem: HeadingLine | CodeBlock | ParagraphLine;
-
-CodeBlock: ColaCodeBlock | RegularCodeBlock;
-
-ColaCodeBlock: ColaCodeStart ColaSyntax ColaCodeEnd;
-
-ColaSyntax: Entity*;
+Cola: Entity*;
 
 Entity: PluralEntity | SingularEntity;
 
@@ -23,32 +19,20 @@ Field: Identifier Colon FieldValue;
 
 FieldValue: QuotedStringDouble | QuotedStringSingle | Number | BooleanTrue | BooleanFalse;
 
-RegularCodeBlock: RegularCodeStart RegularCodeLine* RegularCodeEnd;
-
-RegularCodeStart: RegularCodeStartNamed | RegularCodeStartUnnamed;
-
 // Special rule always applied to each token.
 Layout: WS+ | EMPTY;
 
 terminals
 	BooleanTrue: 'true';
 	BooleanFalse: 'false';
-	ColaCodeStart: /```[ \t]*cola[ \t]*\n/;
-    ColaCodeEnd: /```[ \t]*\n?/;
 	Colon: ':';
 	Comma: ',';
-	HeadingLine: /#{1,6}[ \t]+[^\n]*\n/;
 	Identifier: /[a-zA-Z_][a-zA-Z0-9_.-]*/;
-    Number: /[+-]?[0-9]+(\.[0-9]+)?/;
-	ParagraphLine: /[^#`\n][^\n]*\n/;
+	Number: /[+-]?[0-9]+(\.[0-9]+)?/;
 	PluralKeyword: "plural";
 	QuotedStringDouble: /"([^"\\]|\\.)*"/;
-    QuotedStringSingle: /'([^'\\]|\\.)*'/;
-	RegularCodeLine: /[^\n]*\n/;
-	RegularCodeStartNamed: /```[a-z]+[ \t]*\n/;
-    RegularCodeStartUnnamed: /```[ \t]*\n/;
-	RegularCodeEnd: /```[ \t]*\n?/;
+	QuotedStringSingle: /'([^'\\]|\\.)*'/;
 	Semicolon: ';';
 	UnquotedString: /[a-zA-Z0-9_.-]+/;
 	// Terminal for whitespace used by the Layout rule
-    WS: /\s+/;
+	WS: /\s+/;

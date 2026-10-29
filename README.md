@@ -124,7 +124,11 @@ model plural models:
 ### Parser
 
 - Parses standalone `.cola` files and Markdown files with embedded cola blocks
-- Produces structured configuration models
+- Finds cola blocks with CommonMark's fence rules, so any other fenced block
+  (`mermaid`, `toml`, a bare ```` ``` ````) is skipped and any prose is allowed
+- Produces structured configuration models whose source locations point into
+  the original file
+- Reports errors as `path:line:col: message`
 
 ### Code Generator
 
@@ -150,9 +154,15 @@ colap = "0.1"
 
 The colap codebase is organized into the following modules:
 
+- `lib.rs`: The entry points — `parse_file`, `parse_str`, `parse_literate_str`
+  and `parse_cola_str`
+- `literate`: The markdown layer — a CommonMark-style fence scanner that hands
+  only the bodies of ```` ```cola ```` blocks to the parser
+- `error`: The error type, with file-accurate locations
 - `parser`: Handles parsing of Cola syntax using rustemo
   - `cola.rs`: Generated parser code
   - `cola_actions.rs`: Parser actions
+- `highlight`: A line lexer for editors, sharing the scanner's fence rules
 - `model`: Contains the configuration model definitions
   - `config_model.rs`: Core configuration model and node types
   - `model_builder.rs`: Builds config model from parsed AST
@@ -306,29 +316,26 @@ For example:
 The generated code includes integration tests that demonstrate how to parse configuration files:
 
 ```rust
-use colap::cola::ColaParser;
-use colap::model_builder::ModelBuilder;
 use my_config::Root;  // Generated crate name
 
-// Load and parse a configuration file
+// Load and parse a configuration file: markdown with ```cola fences,
+// or a bare .cola file. Errors read `path:line:col: message`.
 fn parse_config_file(path: &str) -> Root {
-    // Read the file content
-    let content = std::fs::read_to_string(path).expect("Failed to read config file");
-    
-    // Create a parser and parse the content
-    let parser = ColaParser::new();
-    let result = parser.parse(&content).expect("Failed to parse configuration");
-    
-    // Build the configuration model
-    let model = ModelBuilder::build_config_model(&result).expect("Failed to build config model");
-    
-    // Create the root entity from the model
-    Root::from_model(&model)
+    let parsed = colap::parse_file(path).expect("Failed to parse configuration");
+    for warning in &parsed.warnings {
+        eprintln!("warning: {warning}");
+    }
+    Root::from_model(&parsed.model)
 }
 
 // Usage example
 let config = parse_config_file("path/to/config.md");
 ```
+
+The library exposes the same entry points for text already in memory:
+`parse_literate_str` for markdown, `parse_cola_str` for bare cola, and
+`parse_str`, which treats text as literate when it contains a cola fence and
+as bare cola otherwise. Consumers do not need a `rustemo` dependency.
 
 ### Accessing Configuration Values
 
@@ -374,7 +381,26 @@ let api_type = llm.api().and_then(|api| api.type_()).unwrap_or("No API type spec
 
 ### 📄 Embedded Markdown Support
 
-Colap parses configurations directly from Markdown. Any fenced block marked \`\`\`cola is automatically parsed, supporting documentation-driven development.
+Colap parses configurations directly from Markdown. Any fenced block whose
+language is `cola` is parsed, supporting documentation-driven development.
+The rest of the document is prose and is never looked at: headings, tables,
+blockquotes, HTML, lines starting with inline code or a bare `#`, and fenced
+blocks in any other language are all fine.
+
+Fences follow [CommonMark](https://spec.commonmark.org/0.31.2/#fenced-code-blocks):
+
+- an opening fence is three or more backticks or tildes, indented by at most
+  three spaces, followed by an info string whose first word is the language
+  (```` ```cola ````, `~~~cola`, ```` ```cola title="LLM providers" ````);
+- the closing fence uses the same character and is at least as long, so a
+  four-backtick block can quote a three-backtick cola example without it
+  being parsed;
+- a fence that is never closed runs to the end of the file and is reported
+  as a warning naming its opening line.
+
+Files named `.md` or `.markdown` are always read as literate documents; any
+other file is read as literate when it contains a cola fence and as bare
+cola otherwise.
 
 ---
 

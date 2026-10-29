@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //! cola's token vocabulary, for editors.
 //!
 //! An error-tolerant, **line-state** lexer over the grammar's terminals
@@ -8,8 +9,15 @@
 //! the mid-edit buffers editors hold; lexing never does). Ranges are
 //! byte ranges within the line. The parser stays the source of truth
 //! for *meaning*; this module only names what each span *is*.
+//!
+//! Fence shapes come from [`crate::literate`], the same functions the
+//! parser's scanner uses, so the editor and the parser agree on where a
+//! cola block starts and ends.
 
+use crate::literate::{closes, fence_opener};
 use std::ops::Range;
+
+pub use crate::literate::Fence;
 
 /// Which region the *next* line starts in.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -17,10 +25,21 @@ pub enum LineState {
     /// Markdown prose between fences.
     #[default]
     Prose,
-    /// Inside a ```cola fence — entity syntax.
-    Cola,
-    /// Inside a regular fenced code block.
-    Code,
+    /// Inside a cola fence — entity syntax — opened with this fence.
+    Cola(Fence),
+    /// Inside a regular fenced code block opened with this fence.
+    Code(Fence),
+}
+
+impl LineState {
+    /// A bare `.cola` buffer starts here: entity syntax with no fence
+    /// to close it. Three backticks are a closer that cannot appear
+    /// in cola, so the state is stable.
+    pub const BARE_COLA: LineState = LineState::Cola(Fence { ch: b'`', len: 3 });
+
+    pub fn is_cola(self) -> bool {
+        matches!(self, LineState::Cola(_))
+    }
 }
 
 /// What a span is, in cola's own vocabulary.
@@ -28,7 +47,7 @@ pub enum LineState {
 pub enum TokenKind {
     /// A markdown heading line (`#` … `######`).
     Heading,
-    /// A fence delimiter line (```` ```cola ````, ```` ``` ````, named opens).
+    /// A fence delimiter line (```` ```cola ````, ```` ``` ````, `~~~`, named opens).
     Fence,
     /// A line inside a regular (non-cola) code block.
     CodeLine,
@@ -56,43 +75,57 @@ pub struct Token {
 /// returns the tokens and the state for the next line. Unrecognised
 /// bytes are skipped, never an error.
 pub fn line_tokens(line: &str, state: LineState) -> (Vec<Token>, LineState) {
-    let trimmed = line.trim_end_matches('\n');
-    let fence = trimmed.trim_start();
     match state {
         LineState::Prose => {
-            if let Some(info) = fence.strip_prefix("```") {
-                let next = if info.trim() == "cola" {
-                    LineState::Cola
+            if let Some((fence, info)) = fence_opener(line) {
+                let next = if info.split_whitespace().next() == Some("cola") {
+                    LineState::Cola(fence)
                 } else {
-                    LineState::Code
+                    LineState::Code(fence)
                 };
                 (vec![whole(line, TokenKind::Fence)], next)
-            } else if fence.starts_with('#') {
+            } else if is_heading(line) {
                 (vec![whole(line, TokenKind::Heading)], LineState::Prose)
             } else {
                 // Prose stays unstyled — the document's own voice.
                 (Vec::new(), LineState::Prose)
             }
         }
-        LineState::Code => {
-            if fence.starts_with("```") {
+        LineState::Code(fence) => {
+            if closes(line, fence) {
                 (vec![whole(line, TokenKind::Fence)], LineState::Prose)
             } else {
-                (vec![whole(line, TokenKind::CodeLine)], LineState::Code)
+                (vec![whole(line, TokenKind::CodeLine)], state)
             }
         }
-        LineState::Cola => {
-            if fence.starts_with("```") {
-                return (vec![whole(line, TokenKind::Fence)], LineState::Prose);
+        LineState::Cola(fence) => {
+            if closes(line, fence) {
+                (vec![whole(line, TokenKind::Fence)], LineState::Prose)
+            } else {
+                (cola_tokens(line), state)
             }
-            (cola_tokens(line), LineState::Cola)
         }
     }
 }
 
+/// An ATX heading: up to three spaces, one to six `#`, then a blank or
+/// the end of the line. `#tag` and `#1` are prose.
+fn is_heading(line: &str) -> bool {
+    let rest = line.trim_end_matches(['\n', '\r']).trim_start_matches(' ');
+    if line.len() - rest.len() > 3 {
+        return false;
+    }
+    let hashes = rest.bytes().take_while(|&b| b == b'#').count();
+    (1..=6).contains(&hashes)
+        && rest[hashes..]
+            .bytes()
+            .next()
+            .is_none_or(|b| b == b' ' || b == b'\t')
+}
+
 fn whole(line: &str, kind: TokenKind) -> Token {
     Token {
-        range: 0..line.trim_end_matches('\n').len(),
+        range: 0..line.trim_end_matches(['\n', '\r']).len(),
         kind,
     }
 }
@@ -209,9 +242,39 @@ mod tests {
 
     #[test]
     fn mid_edit_unterminated_string_reaches_eol_and_recovers() {
-        let (toks, next) = line_tokens("name: \"unterm\n", LineState::Cola);
+        let (toks, next) = line_tokens("name: \"unterm\n", LineState::BARE_COLA);
         assert_eq!(toks.last().unwrap().kind, TokenKind::String);
-        assert_eq!(next, LineState::Cola);
+        assert!(next.is_cola());
+    }
+
+    #[test]
+    fn fence_shapes_follow_the_scanner() {
+        use TokenKind::*;
+        // Tilde fences, info strings, and a long fence quoting a short one.
+        let doc = "~~~cola title=\"x\"\na: b: 1;\n~~~\n````md\n```cola\n````\n";
+        let got = run(doc);
+        assert_eq!(got[0], ("~~~cola title=\"x\"".into(), Fence));
+        assert_eq!(got[1], ("a".into(), Identifier));
+        assert!(got.contains(&("~~~".into(), Fence)));
+        assert!(got.contains(&("```cola".into(), CodeLine)));
+        // A short closer does not close a long fence.
+        let long = crate::literate::Fence { ch: b'`', len: 4 };
+        let (_, s) = line_tokens("```\n", LineState::Code(long));
+        assert_eq!(s, LineState::Code(long));
+    }
+
+    #[test]
+    fn headings_need_a_blank_after_the_hashes() {
+        assert!(run("# H\n").iter().any(|(_, k)| *k == TokenKind::Heading));
+        assert!(
+            run("###### H\n")
+                .iter()
+                .any(|(_, k)| *k == TokenKind::Heading)
+        );
+        assert!(run("#\n").iter().any(|(_, k)| *k == TokenKind::Heading));
+        assert!(run("#tag\n").is_empty());
+        assert!(run("#1\n").is_empty());
+        assert!(run("####### seven\n").is_empty());
     }
 
     /// Drift alarm: the literal terminals the grammar declares lex to
@@ -220,16 +283,16 @@ mod tests {
     fn lexer_covers_the_grammars_literal_terminals() {
         let grammar = include_str!("grammar/cola.rustemo");
         assert!(grammar.contains("PluralKeyword: \"plural\""));
-        let (t, _) = line_tokens("plural", LineState::Cola);
+        let (t, _) = line_tokens("plural", LineState::BARE_COLA);
         assert_eq!(t[0].kind, TokenKind::Keyword);
         for (lit, kind) in [("true", TokenKind::Boolean), ("false", TokenKind::Boolean)] {
             assert!(grammar.contains(&format!("'{lit}'")));
-            let (t, _) = line_tokens(lit, LineState::Cola);
+            let (t, _) = line_tokens(lit, LineState::BARE_COLA);
             assert_eq!(t[0].kind, kind, "{lit}");
         }
         for p in [":", ",", ";"] {
             assert!(grammar.contains(&format!("'{p}'")));
-            let (t, _) = line_tokens(p, LineState::Cola);
+            let (t, _) = line_tokens(p, LineState::BARE_COLA);
             assert_eq!(t[0].kind, TokenKind::Punctuation, "{p}");
         }
     }

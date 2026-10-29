@@ -1,7 +1,3 @@
-use rustemo::Parser;
-use colap::parser::cola::ColaParser;
-use colap::model::config_model::ConfigModel;
-use colap::model::model_builder::ModelBuilder;
 {{#if is_crate}}
 use {{sanitized_crate_name}}::Root;
 {{#each plural_entity_types}}
@@ -15,11 +11,8 @@ use crate::{{this}};
 {{/if}}
 
 fn parse_config_file(path: &str) -> Root {
-    let content = std::fs::read_to_string(path).expect("Failed to read config file");
-    let parser = ColaParser::new();
-    let result = parser.parse(&content).expect("Failed to parse configuration");
-    let model = ModelBuilder::build_config_model(&result).expect("Failed to build config model");
-    Root::from_model(&model)
+    let parsed = colap::parse_file(path).expect("Failed to parse configuration");
+    Root::from_model(&parsed.model)
 }
 
 #[test]

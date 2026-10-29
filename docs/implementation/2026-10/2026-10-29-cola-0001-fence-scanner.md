@@ -1,8 +1,12 @@
 ---
 date: 2026-10-29
-type: implementation
+type: task
 ticket: COLA-0001
-status: in-progress
+status: done
+affects:
+  - README.md
+  - src/grammar/cola.rustemo
+  - src/highlight.rs
 tasks:
   - docs/tasks/2026-10/2026-10-29-parse-non-cola-fenced-blocks.md
   - docs/tasks/2026-10/2026-10-29-accept-any-prose-line.md
@@ -75,17 +79,48 @@ asks for, and it removes the `rustemo` dependency from generated crates.
 
 ## Verification
 
-- [ ] `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`,
-      `cargo test` are clean.
-- [ ] Every reproduction in the two task files parses, and a foreign block
-      containing cola-looking text is ignored.
-- [ ] An error in the second cola block of a file reports the file's own
-      line and the file path.
-- [ ] `colap tests/data/test_genite.md` still generates a crate whose tests
-      pass without a `rustemo` dependency.
-- [ ] Highlighter state agrees with the scanner on every fixture.
-- [ ] README updated; journal entry proposed.
+- [x] `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`,
+      `cargo test` are clean (39 tests: 15 unit, 12 literate, 11 parser,
+      1 model builder).
+- [x] Every reproduction in the two task files parses, and a foreign block
+      containing cola-looking text is ignored (`tests/literate.rs`).
+- [x] An error in the second cola block of a file reports the file's own
+      line and the file path (`second-block-error.md`, line 13 column 8).
+- [x] `colap tests/data/test_genite.md` generates a crate whose three tests
+      pass with `colap` as its only dependency.
+- [x] Highlighter state agrees with the scanner on every fixture
+      (`highlighter_and_scanner_agree_on_every_fixture`).
+- [x] README updated; journal entry proposed.
 
 ## Outcome
 
-(filled in before the change proposal)
+Built as planned, with these departures from the action items:
+
+- **No second grammar copy at all.** Instead of refreshing `src/cola.rustemo`
+  on each build, `build.rs` calls `process_grammar` on
+  `src/grammar/cola.rustemo` directly and moves the generated files to
+  `src/parser/`. The stale `src/grammar/cola.rs` and `cola_actions.rs` that
+  rustemo used to leave beside the grammar are gone too. This closes the
+  "single grammar source" deliverable of the spec task early.
+- **Error messages keep only rustemo's verdict line** (`Expected one of …`);
+  the context excerpt it prefixes is redundant once the location is exact.
+- **`rustemo` is re-exported** (`colap::rustemo`) as the escape hatch the
+  incubation note describes, beside the facade.
+- **`LineState::BARE_COLA`** was added for editors that open a fence-less
+  `.cola` buffer, since the state now carries a fence.
+
+Breaking changes for the next release (0.3.0):
+
+- `ColaParser::parse` now parses one cola block, not a markdown document.
+  Callers switch to `colap::parse_file` / `parse_str` (chaiss's
+  `cola_config.rs` wraps bare text in a synthetic fence today; `parse_str`
+  makes that unnecessary).
+- `highlight::LineState::Cola` and `Code` carry a `Fence`. aicogito's
+  `state == LineState::Cola` becomes `state.is_cola()`.
+- `ModelBuilder` is now a struct with `new` / `add_block` / `finish`;
+  `build_config_model` remains for a single block.
+
+Left for the tasks that own them: the rustemo trace still prints unless
+`RUSTEMO_NOTRACE=1` is set (`build.rs` asks for `notrace`, but the runtime
+ignores it — the diagnostics task), and `tests/parser.rs` keeps the original
+per-file tests rather than the conformance corpus (the spec task).

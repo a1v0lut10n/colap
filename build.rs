@@ -17,9 +17,12 @@ fn main() {
     // Delete generated files before regenerating
     let actions_paths = [
         Path::new("src/parser/cola_actions.rs"),
-        Path::new("src/cola_actions.rs"),
+        Path::new("src/grammar/cola_actions.rs"),
     ];
-    let cola_paths = [Path::new("src/parser/cola.rs"), Path::new("src/cola.rs")];
+    let cola_paths = [
+        Path::new("src/parser/cola.rs"),
+        Path::new("src/grammar/cola.rs"),
+    ];
 
     // Clean up any existing files
     for path in actions_paths.iter().chain(cola_paths.iter()) {
@@ -31,36 +34,30 @@ fn main() {
         }
     }
 
-    // Make sure src/cola.rustemo exists by copying from src/grammar if needed
-    let grammar_src = Path::new("src/grammar/cola.rustemo");
-    let grammar_dest = Path::new("src/cola.rustemo");
-    if !grammar_dest.exists()
-        && grammar_src.exists()
-        && let Err(e) = fs::copy(grammar_src, grammar_dest)
-    {
-        eprintln!("Failed to copy grammar file: {e}");
-        exit(1);
-    }
-
+    // src/grammar/cola.rustemo is the one grammar. rustemo generates
+    // the parser and actions next to it; they are then moved under
+    // src/parser so the grammar directory holds only the grammar.
     let mut settings = rustemo_compiler::Settings::new();
     settings = settings.in_source_tree();
     settings = settings.builder_loc_info(true);
     settings = settings.notrace(true); // Disable debug trace output
 
-    // Generate the parser code
-    if let Err(e) = settings.process_dir() {
+    if let Err(e) = settings.process_grammar(Path::new("src/grammar/cola.rustemo")) {
         eprintln!("{e}");
         exit(1);
     }
 
     // Move generated files to parser directory
-    if let Err(e) = copy_file(Path::new("src/cola.rs"), Path::new("src/parser/cola.rs")) {
+    if let Err(e) = copy_file(
+        Path::new("src/grammar/cola.rs"),
+        Path::new("src/parser/cola.rs"),
+    ) {
         eprintln!("Failed to move cola.rs: {e}");
         exit(1);
     }
 
     if let Err(e) = copy_file(
-        Path::new("src/cola_actions.rs"),
+        Path::new("src/grammar/cola_actions.rs"),
         Path::new("src/parser/cola_actions.rs"),
     ) {
         eprintln!("Failed to move cola_actions.rs: {e}");
@@ -81,16 +78,15 @@ fn main() {
         .status();
 
     // Clean up the original files
-    if let Err(e) = fs::remove_file(Path::new("src/cola.rs")) {
-        eprintln!("Failed to remove src/cola.rs: {e}");
-        exit(1);
-    }
-
-    if let Err(e) = fs::remove_file(Path::new("src/cola_actions.rs")) {
-        eprintln!("Failed to remove src/cola_actions.rs: {e}");
-        exit(1);
+    for path in [
+        Path::new("src/grammar/cola.rs"),
+        Path::new("src/grammar/cola_actions.rs"),
+    ] {
+        if let Err(e) = fs::remove_file(path) {
+            eprintln!("Failed to remove {}: {e}", path.display());
+            exit(1);
+        }
     }
 
     println!("cargo:rerun-if-changed=src/grammar/cola.rustemo");
-    println!("cargo:rerun-if-changed=src/cola.rustemo");
 }
