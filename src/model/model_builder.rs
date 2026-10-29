@@ -194,12 +194,12 @@ impl ModelBuilder {
                     n_str
                         .parse::<f64>()
                         .map(ConfigValue::Float)
-                        .map_err(|_| format!("Failed to parse float: {n_str}"))
+                        .map_err(|_| format!("invalid float: {n_str}"))
                 } else {
                     n_str
                         .parse::<i64>()
                         .map(ConfigValue::Integer)
-                        .map_err(|_| format!("Failed to parse integer: {n_str}"))
+                        .map_err(|_| format!("integer out of range: {n_str}"))
                 }
             }
             FieldValue::BooleanTrue => Ok(ConfigValue::Boolean(true)),

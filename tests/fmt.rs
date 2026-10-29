@@ -54,9 +54,9 @@ fn every_clean_fixture_round_trips_and_is_idempotent() {
     let mut checked = 0;
     for dir in [
         "tests/data",
-        "tests/data/literate",
-        "tests/data/duplicates",
         "tests/data/fmt",
+        "tests/conformance/valid",
+        "tests/conformance/invalid",
     ] {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
@@ -96,7 +96,7 @@ fn every_clean_fixture_round_trips_and_is_idempotent() {
 
 #[test]
 fn a_bare_file_is_formatted_whole() {
-    let formatted = format_file("tests/data/literate/bare.cola").expect("format");
+    let formatted = format_file("tests/conformance/valid/bare.cola").expect("format");
     assert_eq!(formatted.text, "root_entity: name: \"bare\";\n");
     assert_eq!(formatted.changed, vec![1]);
 }
@@ -135,7 +135,7 @@ fn fmt_rewrites_in_place_and_check_reports_the_block() {
 fn fmt_refuses_a_file_with_errors_and_leaves_it_alone() {
     let dir = scratch("errors");
     let file = dir.join("field-twice.md");
-    std::fs::copy("tests/data/duplicates/field-twice.md", &file).expect("copy");
+    std::fs::copy("tests/conformance/invalid/field-twice.md", &file).expect("copy");
     let file_str = file.to_str().expect("utf-8 path");
 
     let out = colap(&["fmt", file_str]);
@@ -145,7 +145,10 @@ fn fmt_refuses_a_file_with_errors_and_leaves_it_alone() {
         "{}",
         stdout(&out)
     );
-    assert_eq!(read(&file), read("tests/data/duplicates/field-twice.md"));
+    assert_eq!(
+        read(&file),
+        read("tests/conformance/invalid/field-twice.md")
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

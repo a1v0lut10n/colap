@@ -2,13 +2,19 @@
 //! The duplicate rules of `docs/design/2026-10-29-duplicate-key-semantics.md`:
 //! keys are defined once, slots reopen, fields are set once, one
 //! namespace per entity, every error reported. Fixtures live under
-//! `tests/data/duplicates/`.
+//! `tests/conformance/` (valid and invalid).
 use colap::config_model::{ConfigModel, ConfigValue, DuplicateKind, ModelError};
 use colap::{Error, Parsed};
 use std::path::{Path, PathBuf};
 
 fn fixture(name: &str) -> PathBuf {
-    Path::new("tests/data/duplicates").join(name)
+    // The fixtures are the conformance corpus: a file is valid or invalid.
+    let valid = Path::new("tests/conformance/valid").join(name);
+    if valid.exists() {
+        valid
+    } else {
+        Path::new("tests/conformance/invalid").join(name)
+    }
 }
 
 fn parse(name: &str) -> Parsed {

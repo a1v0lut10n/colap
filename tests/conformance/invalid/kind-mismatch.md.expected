@@ -1,0 +1,1 @@
+<path>:7:1: error: `api` in the root is declared `api` and cannot be reopened as `api plural apis`; first at 4:1
