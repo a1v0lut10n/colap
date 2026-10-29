@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: planned
+status: done
 affects:
   - README.md
 tags: [cli, diagnostics, tooling]

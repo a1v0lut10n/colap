@@ -98,6 +98,33 @@ impl Error {
         }
     }
 
+    /// The 1-based line and column the error is reported at, when it
+    /// has them.
+    pub fn location(&self) -> Option<(u32, u32)> {
+        match self {
+            Error::Parse { line, column, .. } => Some((*line, *column)),
+            Error::Model { error, .. } => error
+                .location()
+                .map(|loc| (loc.start_line, loc.start_column + 1)),
+            Error::Io { .. } => None,
+            Error::Multiple(errors) => errors.first().and_then(Error::location),
+        }
+    }
+
+    /// The message without path or location.
+    pub fn message(&self) -> String {
+        match self {
+            Error::Parse { message, .. } => message.clone(),
+            Error::Model { error, .. } => error.to_string(),
+            Error::Io { source, .. } => source.to_string(),
+            Error::Multiple(errors) => errors
+                .iter()
+                .map(Error::message)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+
     /// Every individual error, flattening [`Error::Multiple`].
     pub fn each(&self) -> Box<dyn Iterator<Item = &Error> + '_> {
         match self {
