@@ -3,16 +3,18 @@
 //!
 //! `colap check FILE...` validates files and prints every finding as
 //! `path:line:col: severity: message` (or as a cola block with
-//! `--format cola`); it writes nothing. Exit codes are lint-style: 0
-//! clean, 1 errors, 2 usage. `colap generate` emits a Rust crate or
-//! module and stays the default when no subcommand is given, so
-//! `colap FILE` keeps working.
+//! `--format cola`); it writes nothing. `colap fmt FILE...` rewrites
+//! the cola blocks of files into the canonical layout, in place
+//! (`--check` only reports). Exit codes are lint-style: 0 clean, 1
+//! errors, 2 usage. `colap generate` emits a Rust crate or module and
+//! stays the default when no subcommand is given, so `colap FILE`
+//! keeps working.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use colap::diagnostic::{self, Severity};
+use colap::diagnostic::{self, Diagnostic, Severity};
 use colap::generator::{CodeGenerator, GenerationMode};
 
 /// The `generate` arguments, shared by the subcommand and the top level.
@@ -78,6 +80,23 @@ fn cli() -> Command {
                         .help("text: one `path:line:col: severity: message` per finding; cola: a cola block of findings"),
                 ),
         )
+        .subcommand(
+            Command::new("fmt")
+                .about("Rewrite the cola blocks of files into the canonical layout, in place")
+                .arg(
+                    Arg::new("files")
+                        .value_name("FILE")
+                        .required(true)
+                        .num_args(1..)
+                        .value_parser(clap::value_parser!(PathBuf)),
+                )
+                .arg(
+                    Arg::new("check")
+                        .long("check")
+                        .action(ArgAction::SetTrue)
+                        .help("Write nothing; exit 1 if any block is not canonical"),
+                ),
+        )
         .subcommand(generate_args(
             Command::new("generate").about("Generate a Rust crate or module (the default command)"),
         ))
@@ -109,6 +128,7 @@ fn main() -> ExitCode {
 
     match matches.subcommand() {
         Some(("check", m)) => check(m),
+        Some(("fmt", m)) => fmt(m),
         Some(("generate", m)) => generate(m),
         _ => generate(&matches),
     }
@@ -131,6 +151,44 @@ fn check(matches: &ArgMatches) -> ExitCode {
     }
 
     if findings.iter().any(|d| d.severity == Severity::Error) {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+fn fmt(matches: &ArgMatches) -> ExitCode {
+    let check_only = matches.get_flag("check");
+    let files = matches.get_many::<PathBuf>("files").into_iter().flatten();
+    let mut failed = false;
+    for path in files {
+        let formatted = match colap::format::format_file(path) {
+            Ok(formatted) => formatted,
+            Err(error) => {
+                for finding in Diagnostic::from_error(&error) {
+                    println!("{finding}");
+                }
+                failed = true;
+                continue;
+            }
+        };
+        if formatted.is_canonical() {
+            continue;
+        }
+        if check_only {
+            for line in &formatted.changed {
+                println!(
+                    "{}:{line}:1: error: not canonical; run `colap fmt`",
+                    path.display()
+                );
+            }
+            failed = true;
+        } else if let Err(e) = std::fs::write(path, &formatted.text) {
+            println!("{}: error: {e}", path.display());
+            failed = true;
+        }
+    }
+    if failed {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
