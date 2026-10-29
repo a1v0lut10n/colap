@@ -2,7 +2,7 @@
 //! The markdown layer: fences of every shape, prose of every shape,
 //! locations in the original file, dialect detection, and the editor
 //! highlighter agreeing with the scanner. Fixtures live under
-//! `tests/data/literate/`; the reproductions come from the 2026-10-29
+//! `tests/conformance/`; the reproductions come from the 2026-10-29
 //! field-test tasks.
 use colap::config_model::ConfigValue;
 use colap::highlight::{LineState, line_tokens};
@@ -12,7 +12,13 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 fn fixture(name: &str) -> PathBuf {
-    Path::new("tests/data/literate").join(name)
+    // The fixtures are the conformance corpus: a file is valid or invalid.
+    let valid = Path::new("tests/conformance/valid").join(name);
+    if valid.exists() {
+        valid
+    } else {
+        Path::new("tests/conformance/invalid").join(name)
+    }
 }
 
 fn parse(name: &str) -> Parsed {
@@ -191,7 +197,11 @@ fn cola_lines_by_highlighter(text: &str) -> BTreeSet<u32> {
 #[test]
 fn highlighter_and_scanner_agree_on_every_fixture() {
     let mut checked = 0;
-    for dir in ["tests/data", "tests/data/literate"] {
+    for dir in [
+        "tests/data",
+        "tests/conformance/valid",
+        "tests/conformance/invalid",
+    ] {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             if path.extension().is_none_or(|e| e != "md") {

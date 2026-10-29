@@ -40,7 +40,7 @@ fn check_a_clean_file_is_silent_and_exits_0() {
 
 #[test]
 fn check_reports_every_error_and_exits_1() {
-    let path = "tests/data/duplicates/several-errors.md";
+    let path = "tests/conformance/invalid/several-errors.md";
     let out = colap(&["check", path]);
     assert_eq!(code(&out), 1);
     assert_eq!(
@@ -58,18 +58,18 @@ fn check_warns_about_silent_pitfalls_and_exits_0() {
     for (file, expected) in [
         (
             "no-cola.md",
-            "tests/data/literate/no-cola.md: warning: no cola blocks in this file\n",
+            "tests/conformance/valid/no-cola.md: warning: no cola blocks in this file\n",
         ),
         (
             "unterminated.md",
-            "tests/data/literate/unterminated.md:3:1: warning: unclosed cola fence runs to the end of the file\n",
+            "tests/conformance/valid/unterminated.md:3:1: warning: unclosed cola fence runs to the end of the file\n",
         ),
         (
             "empty-entity.md",
-            "tests/data/literate/empty-entity.md:5:5: warning: empty entity `llm/api`\n",
+            "tests/conformance/valid/empty-entity.md:5:5: warning: empty entity `llm/api`\n",
         ),
     ] {
-        let path = format!("tests/data/literate/{file}");
+        let path = format!("tests/conformance/valid/{file}");
         let out = colap(&["check", &path]);
         assert_eq!(code(&out), 0, "{file}: {}", stderr(&out));
         assert_eq!(stdout(&out), expected, "{file}");
@@ -81,8 +81,8 @@ fn check_takes_several_files() {
     let out = colap(&[
         "check",
         "tests/data/test_genite.md",
-        "tests/data/duplicates/field-twice.md",
-        "tests/data/literate/no-cola.md",
+        "tests/conformance/invalid/field-twice.md",
+        "tests/conformance/valid/no-cola.md",
     ]);
     assert_eq!(code(&out), 1);
     let text = stdout(&out);
@@ -116,8 +116,8 @@ fn check_format_cola_round_trips_through_colap() {
         "check",
         "--format",
         "cola",
-        "tests/data/duplicates/several-errors.md",
-        "tests/data/literate/no-cola.md",
+        "tests/conformance/invalid/several-errors.md",
+        "tests/conformance/valid/no-cola.md",
     ]);
     assert_eq!(code(&out), 1);
     let text = stdout(&out);
@@ -177,7 +177,7 @@ fn generate_is_the_default_command_and_also_works_by_name() {
 fn generate_reports_findings_on_stderr_and_exits_1_on_errors() {
     let dir = scratch("generate-errors");
     let out = colap(&[
-        "tests/data/duplicates/field-twice.md",
+        "tests/conformance/invalid/field-twice.md",
         "-o",
         dir.to_str().expect("utf-8 temp dir"),
         "-m",

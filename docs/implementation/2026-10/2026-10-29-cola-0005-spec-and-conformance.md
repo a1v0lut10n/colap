@@ -2,7 +2,7 @@
 date: 2026-10-29
 type: task
 ticket: COLA-0005
-status: in-progress
+status: done
 affects:
   - README.md
   - docs/spec/cola.md
@@ -53,11 +53,31 @@ the token level.
 
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] `colap check docs/spec/cola.md` is clean.
-- [ ] Every corpus file's diagnostics equal its sidecar.
-- [ ] `aivolution lint .` clean; README updated; journal entry proposed.
+- [x] The three Rust gates are clean (77 tests; 4 new in
+      `tests/conformance.rs`).
+- [x] `colap check docs/spec/cola.md` is clean, and a test keeps it so.
+- [x] Every corpus file's diagnostics equal its sidecar (25 files, 14
+      sidecars).
+- [x] `aivolution lint .` has no errors; README updated; journal entry
+      proposed.
 
 ## Outcome
 
-(filled in before the change proposal)
+Built as planned. Notes beyond the action items:
+
+- The token-level parity test walks the AST for located terminals
+  (identifiers, numbers, strings) and compares them with the highlighter's
+  tokens on every cola line of every corpus file, the fixtures and the
+  spec. It confirmed that rustemo's columns are byte offsets with an
+  exclusive end. Two things are left out on both sides by design: lines
+  inside a multi-line string (a line lexer cannot see one token across
+  lines) and names spelled like keywords (the highlighter shows them as
+  keywords; the spec says so).
+- Corpus files added beyond the moved fixtures: `integer-overflow.md`,
+  `keywords-as-names.md`, `values.md`.
+- The linter has no document type or location for a spec:
+  `docs/spec/cola.md` carries `type: spec` frontmatter and is reported as
+  an unrecognized location (a warning, not an error). That is a gap for
+  aivolution-meta's schemas, recorded in the journal entry.
+- Already done before this task and only verified here: the single
+  grammar source (COLA-0001) and the fence-level highlighter parity.

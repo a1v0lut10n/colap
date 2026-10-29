@@ -1,0 +1,1 @@
+<path>:6:5: error: `b` in `a` is already a field and cannot also be an entity; first at 5:5

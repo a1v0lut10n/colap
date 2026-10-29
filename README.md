@@ -80,10 +80,18 @@ llm plural llms:
 |------------------------------|---------------|--------------|--------------|---------------|
 | Whitespace sensitivity       | 😬 Yes         | 👍 No         | 👍 No         | ✅ No          |
 | Curly brace clutter          | 👍 Minimal     | 😩 Lots       | 👍 Minimal    | ✅ Minimal     |
-| Trailing commas allowed      | ❌ No          | ❌ No         | ✅ Yes        | ✅ Yes         |
+| Trailing commas allowed      | ❌ No          | ❌ No         | ✅ Yes        | ❌ Not yet     |
 | Multi-line strings           | 🤔 Hard        | 😕 Escapes    | ✅ Easy       | ✅ Easy        |
 | Collections (arrays/maps)    | 😕 Indents     | 😩 `[]`, `{}` | 😕 Mixed      | ✅ Infix `plural` |
 | Markdown embedding           | ❌ Awkward     | ❌ Awkward    | ❌ Awkward    | ✅ First-class |
+
+---
+
+The language is specified in [`docs/spec/cola.md`](docs/spec/cola.md), a
+literate document that colap itself checks; a conformance corpus under
+`tests/conformance/` holds the parser, the diagnostics and the highlighter to
+it. Trailing commas, comments and decoded escapes are open decisions listed
+there.
 
 ---
 
@@ -467,6 +475,8 @@ Files named `.md` or `.markdown` are always read as literate documents; any
 other file is read as literate when it contains a cola fence and as bare
 cola otherwise.
 
+The full rules are in the spec, section 2.
+
 ### 🔁 Reopening and duplicates
 
 A name directly under a `plural` header is a **key**: it identifies an
@@ -508,7 +518,7 @@ ledger.md:21:5: duplicate entry `cl-1` in `claim`; first at 18:5
 ```
 
 The design record `docs/design/2026-10-29-duplicate-key-semantics.md` has
-the reasoning.
+the reasoning, and the spec, section 5, the rules in full.
 
 ---
 

@@ -1,0 +1,1 @@
+<path>:12:1: error: `model` in the root is declared `model plural models` and cannot be reopened as `model plural modelz`; first at 4:1
