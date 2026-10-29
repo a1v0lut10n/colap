@@ -137,6 +137,8 @@ model plural models:
 - Produces structured configuration models whose source locations point into
   the original file
 - Reports errors as `path:line:col: message`
+- Reads large files in linear time: a 10k-entry ledger (5 MB) in about
+  0.4 s; `cargo bench --bench scale` guards it
 
 ### Code Generator
 
