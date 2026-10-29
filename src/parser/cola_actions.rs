@@ -7,18 +7,6 @@ pub type Input = str;
 pub type Ctx<'i> = Context<'i, Input>;
 #[allow(dead_code)]
 pub type Token<'i> = RustemoToken<'i, Input, TokenKind>;
-pub type ColaCodeStart = ValLoc<String>;
-pub fn cola_code_start(_ctx: &Ctx, token: Token) -> ColaCodeStart {
-    ColaCodeStart::new(token.value.into(), Some(_ctx.location()))
-}
-pub type ColaCodeEnd = ValLoc<String>;
-pub fn cola_code_end(_ctx: &Ctx, token: Token) -> ColaCodeEnd {
-    ColaCodeEnd::new(token.value.into(), Some(_ctx.location()))
-}
-pub type HeadingLine = ValLoc<String>;
-pub fn heading_line(_ctx: &Ctx, token: Token) -> HeadingLine {
-    HeadingLine::new(token.value.into(), Some(_ctx.location()))
-}
 pub type Identifier = ValLoc<String>;
 pub fn identifier(_ctx: &Ctx, token: Token) -> Identifier {
     Identifier::new(token.value.into(), Some(_ctx.location()))
@@ -26,10 +14,6 @@ pub fn identifier(_ctx: &Ctx, token: Token) -> Identifier {
 pub type Number = ValLoc<String>;
 pub fn number(_ctx: &Ctx, token: Token) -> Number {
     Number::new(token.value.into(), Some(_ctx.location()))
-}
-pub type ParagraphLine = ValLoc<String>;
-pub fn paragraph_line(_ctx: &Ctx, token: Token) -> ParagraphLine {
-    ParagraphLine::new(token.value.into(), Some(_ctx.location()))
 }
 pub type QuotedStringDouble = ValLoc<String>;
 pub fn quoted_string_double(_ctx: &Ctx, token: Token) -> QuotedStringDouble {
@@ -39,98 +23,8 @@ pub type QuotedStringSingle = ValLoc<String>;
 pub fn quoted_string_single(_ctx: &Ctx, token: Token) -> QuotedStringSingle {
     QuotedStringSingle::new(token.value.into(), Some(_ctx.location()))
 }
-pub type RegularCodeLine = ValLoc<String>;
-pub fn regular_code_line(_ctx: &Ctx, token: Token) -> RegularCodeLine {
-    RegularCodeLine::new(token.value.into(), Some(_ctx.location()))
-}
-pub type RegularCodeStartNamed = ValLoc<String>;
-pub fn regular_code_start_named(_ctx: &Ctx, token: Token) -> RegularCodeStartNamed {
-    RegularCodeStartNamed::new(token.value.into(), Some(_ctx.location()))
-}
-pub type RegularCodeStartUnnamed = ValLoc<String>;
-pub fn regular_code_start_unnamed(_ctx: &Ctx, token: Token) -> RegularCodeStartUnnamed {
-    RegularCodeStartUnnamed::new(token.value.into(), Some(_ctx.location()))
-}
-pub type RegularCodeEnd = ValLoc<String>;
-pub fn regular_code_end(_ctx: &Ctx, token: Token) -> RegularCodeEnd {
-    RegularCodeEnd::new(token.value.into(), Some(_ctx.location()))
-}
-pub type Cola = MarkdownItem0;
-pub fn cola_markdown_item0(_ctx: &Ctx, markdown_item0: MarkdownItem0) -> Cola {
-    markdown_item0
-}
-pub type MarkdownItem1 = Vec<MarkdownItem>;
-pub fn markdown_item1_c1(
-    _ctx: &Ctx,
-    mut markdown_item1: MarkdownItem1,
-    markdown_item: MarkdownItem,
-) -> MarkdownItem1 {
-    markdown_item1.push(markdown_item);
-    markdown_item1
-}
-pub fn markdown_item1_markdown_item(_ctx: &Ctx, markdown_item: MarkdownItem) -> MarkdownItem1 {
-    vec![markdown_item]
-}
-pub type MarkdownItem0 = Option<MarkdownItem1>;
-pub fn markdown_item0_markdown_item1(_ctx: &Ctx, markdown_item1: MarkdownItem1) -> MarkdownItem0 {
-    Some(markdown_item1)
-}
-pub fn markdown_item0_empty(_ctx: &Ctx) -> MarkdownItem0 {
-    None
-}
-#[derive(Debug, Clone)]
-pub enum MarkdownItem {
-    HeadingLine(HeadingLine),
-    CodeBlock(CodeBlock),
-    ParagraphLine(ParagraphLine),
-}
-pub fn markdown_item_heading_line(_ctx: &Ctx, heading_line: HeadingLine) -> MarkdownItem {
-    MarkdownItem::HeadingLine(heading_line)
-}
-pub fn markdown_item_code_block(_ctx: &Ctx, code_block: CodeBlock) -> MarkdownItem {
-    MarkdownItem::CodeBlock(code_block)
-}
-pub fn markdown_item_paragraph_line(_ctx: &Ctx, paragraph_line: ParagraphLine) -> MarkdownItem {
-    MarkdownItem::ParagraphLine(paragraph_line)
-}
-#[derive(Debug, Clone)]
-pub enum CodeBlock {
-    ColaCodeBlock(ColaCodeBlock),
-    RegularCodeBlock(RegularCodeBlock),
-}
-pub fn code_block_cola_code_block(_ctx: &Ctx, cola_code_block: ColaCodeBlock) -> CodeBlock {
-    CodeBlock::ColaCodeBlock(cola_code_block)
-}
-pub fn code_block_regular_code_block(
-    _ctx: &Ctx,
-    regular_code_block: RegularCodeBlock,
-) -> CodeBlock {
-    CodeBlock::RegularCodeBlock(regular_code_block)
-}
-#[derive(Debug, Clone)]
-pub struct ColaCodeBlockBase {
-    pub cola_code_start: ColaCodeStart,
-    pub cola_syntax: ColaSyntax,
-    pub cola_code_end: ColaCodeEnd,
-}
-pub type ColaCodeBlock = ValLoc<ColaCodeBlockBase>;
-pub fn cola_code_block_c1(
-    _ctx: &Ctx,
-    cola_code_start: ColaCodeStart,
-    cola_syntax: ColaSyntax,
-    cola_code_end: ColaCodeEnd,
-) -> ColaCodeBlock {
-    ColaCodeBlock::new(
-        ColaCodeBlockBase {
-            cola_code_start,
-            cola_syntax,
-            cola_code_end,
-        },
-        Some(_ctx.location()),
-    )
-}
-pub type ColaSyntax = Entity0;
-pub fn cola_syntax_entity0(_ctx: &Ctx, entity0: Entity0) -> ColaSyntax {
+pub type Cola = Entity0;
+pub fn cola_entity0(_ctx: &Ctx, entity0: Entity0) -> Cola {
     entity0
 }
 pub type Entity1 = Vec<Entity>;
@@ -303,68 +197,4 @@ pub fn field_value_boolean_true(_ctx: &Ctx) -> FieldValue {
 }
 pub fn field_value_boolean_false(_ctx: &Ctx) -> FieldValue {
     FieldValue::BooleanFalse
-}
-#[derive(Debug, Clone)]
-pub struct RegularCodeBlockBase {
-    pub regular_code_start: RegularCodeStart,
-    pub regular_code_line0: RegularCodeLine0,
-    pub regular_code_end: RegularCodeEnd,
-}
-pub type RegularCodeBlock = ValLoc<RegularCodeBlockBase>;
-pub fn regular_code_block_c1(
-    _ctx: &Ctx,
-    regular_code_start: RegularCodeStart,
-    regular_code_line0: RegularCodeLine0,
-    regular_code_end: RegularCodeEnd,
-) -> RegularCodeBlock {
-    RegularCodeBlock::new(
-        RegularCodeBlockBase {
-            regular_code_start,
-            regular_code_line0,
-            regular_code_end,
-        },
-        Some(_ctx.location()),
-    )
-}
-pub type RegularCodeLine1 = Vec<RegularCodeLine>;
-pub fn regular_code_line1_c1(
-    _ctx: &Ctx,
-    mut regular_code_line1: RegularCodeLine1,
-    regular_code_line: RegularCodeLine,
-) -> RegularCodeLine1 {
-    regular_code_line1.push(regular_code_line);
-    regular_code_line1
-}
-pub fn regular_code_line1_regular_code_line(
-    _ctx: &Ctx,
-    regular_code_line: RegularCodeLine,
-) -> RegularCodeLine1 {
-    vec![regular_code_line]
-}
-pub type RegularCodeLine0 = Option<RegularCodeLine1>;
-pub fn regular_code_line0_regular_code_line1(
-    _ctx: &Ctx,
-    regular_code_line1: RegularCodeLine1,
-) -> RegularCodeLine0 {
-    Some(regular_code_line1)
-}
-pub fn regular_code_line0_empty(_ctx: &Ctx) -> RegularCodeLine0 {
-    None
-}
-#[derive(Debug, Clone)]
-pub enum RegularCodeStart {
-    RegularCodeStartNamed(RegularCodeStartNamed),
-    RegularCodeStartUnnamed(RegularCodeStartUnnamed),
-}
-pub fn regular_code_start_regular_code_start_named(
-    _ctx: &Ctx,
-    regular_code_start_named: RegularCodeStartNamed,
-) -> RegularCodeStart {
-    RegularCodeStart::RegularCodeStartNamed(regular_code_start_named)
-}
-pub fn regular_code_start_regular_code_start_unnamed(
-    _ctx: &Ctx,
-    regular_code_start_unnamed: RegularCodeStartUnnamed,
-) -> RegularCodeStart {
-    RegularCodeStart::RegularCodeStartUnnamed(regular_code_start_unnamed)
 }

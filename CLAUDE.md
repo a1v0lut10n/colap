@@ -10,3 +10,5 @@ aivolution-mastermind).
 silently.
 - Through the **Rust development** mindset: `.claude/rules/rust_development.md` (applies to **/*.rs).
 - Skills that apply (from the workspace): `egui-threading`, `time-conventions`.
+- Ticket prefix: `COLA`. The next free number is in `docs/NEXT-TICKET`
+(claim it in the first commit on the branch).

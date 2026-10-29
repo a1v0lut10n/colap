@@ -268,7 +268,7 @@ impl CodeGenerator {
             "crate_name": crate_name,
             "sanitized_crate_name": sanitized_crate_name,
             "is_crate": true,
-            "test_file_path": "tests/data/config.md",
+            "test_file_path": format!("tests/data/{}", self.copied_config_name()),
             "plural_entity_types": plural_entity_types,
             "plural_entity_assertions": plural_entity_assertions
         });
@@ -277,6 +277,14 @@ impl CodeGenerator {
         fs::write(tests_dir.join("integration.rs"), test_content)?;
 
         Ok(())
+    }
+
+    /// The name the input configuration gets inside the generated crate.
+    fn copied_config_name(&self) -> String {
+        match self.source_path.extension().and_then(|e| e.to_str()) {
+            Some(ext) => format!("config.{ext}"),
+            None => "config".to_string(),
+        }
     }
 
     /// Copy the input configuration file to the tests/data directory
@@ -293,13 +301,17 @@ impl CodeGenerator {
             .to_string_lossy()
             .to_string();
 
-        // Copy the input file to tests/data/config.md
-        fs::copy(&self.source_path, tests_data_dir.join("config.md"))?;
+        // Copy the input file, keeping its extension: the facade reads
+        // `.md` as literate and detects the dialect of anything else.
+        fs::copy(
+            &self.source_path,
+            tests_data_dir.join(self.copied_config_name()),
+        )?;
 
         log::info!(
             "Copied {} to {}",
             source_filename,
-            tests_data_dir.join("config.md").display()
+            tests_data_dir.join(self.copied_config_name()).display()
         );
 
         Ok(())

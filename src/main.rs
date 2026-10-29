@@ -2,11 +2,8 @@
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Arg, ArgAction, Command};
-use colap::model::model_builder::ModelBuilder;
-use colap::parser::cola::ColaParser;
-use rustemo::Parser;
 
 use colap::generator::{CodeGenerator, GenerationMode};
 
@@ -86,32 +83,13 @@ fn generate(
     crate_name: String,
     mode: String,
 ) -> Result<()> {
-    let source = std::fs::read_to_string(&input_path)
-        .with_context(|| format!("Unable to read {}", input_path.display()))?;
-
-    let _is_markdown = {
-        let ext = input_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|s| s.to_ascii_lowercase())
-            .unwrap_or_default();
-        ext == "md" || ext == "markdown"
-    };
-
-    // Parse the input using colap
-    let parser = ColaParser::new();
-
-    // For both markdown and cola files, we use the ColaParser
-    // The parser is designed to handle both cola code blocks in markdown
-    // and direct cola content
-    let cola_ast = match parser.parse(&source) {
-        Ok(ast) => ast,
-        Err(e) => return Err(anyhow::anyhow!("Failed to parse input: {}", e)),
-    };
-
-    // Convert the AST to a ConfigModel using ModelBuilder
-    let model = ModelBuilder::build_config_model(&cola_ast)
-        .map_err(|e| anyhow::anyhow!("Failed to build model: {}", e))?;
+    // Markdown (`.md`) is literate; anything else is detected: bare
+    // cola, or literate when it carries a cola fence.
+    let parsed = colap::parse_file(&input_path)?;
+    for warning in &parsed.warnings {
+        eprintln!("{}: warning: {warning}", input_path.display());
+    }
+    let model = parsed.model;
 
     log::info!(
         "Successfully built ConfigModel from {}",

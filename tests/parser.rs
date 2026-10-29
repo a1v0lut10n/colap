@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Integration tests for the Cola parser using Rustemo
+//! Integration tests for the Cola parser: every fixture under
+//! `tests/data/` parses through the facade, and the raw rustemo parser
+//! still accepts a bare block.
 use colap::cola::ColaParser;
-use colap::cola_actions::Cola;
-use rustemo::Parser;
-use std::fs;
+use colap::rustemo::Parser;
 use std::path::Path;
 
 /// Helper to parse a file and assert success
-fn parse_cola_file<P: AsRef<Path>>(path: P) -> Cola {
-    let input = fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Failed to read test file: {}", path.as_ref().display()));
-    let parser = ColaParser::new();
-    parser
-        .parse(&input)
-        .unwrap_or_else(|_| panic!("Parse failed for {}", path.as_ref().display()))
+fn parse_cola_file<P: AsRef<Path>>(path: P) -> colap::Parsed {
+    colap::parse_file(&path)
+        .unwrap_or_else(|e| panic!("Parse failed for {}: {e}", path.as_ref().display()))
 }
 
 #[test]
@@ -64,4 +60,12 @@ fn test_simple_cola_md() {
 #[test]
 fn test_genite_md() {
     parse_cola_file("tests/data/test_genite.md");
+}
+
+#[test]
+fn raw_parser_accepts_a_bare_block() {
+    let ast = ColaParser::new()
+        .parse("llm plural llms: openai: field: \"value\";;")
+        .expect("bare cola parses");
+    assert_eq!(ast.map(|entities| entities.len()), Some(1));
 }

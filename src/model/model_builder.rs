@@ -1,175 +1,128 @@
 // SPDX-License-Identifier: Apache-2.0
+//! From the grammar's AST to a [`ConfigModel`].
+//!
+//! A literate file holds several cola blocks, each parsed on its own
+//! because the grammar only ever sees a fence body. The builder is
+//! therefore incremental: [`ModelBuilder::new`], one
+//! [`ModelBuilder::add_block`] per block with the block's line offset
+//! in the file, then [`ModelBuilder::finish`]. Every
+//! [`SourceLocation`] it records points into the original file.
+
+use crate::error::Error;
 use crate::model::config_model::{ConfigModel, ConfigValue};
 use crate::model::source_location::SourceLocation;
-use crate::parser::cola_actions::{
-    CodeBlock, Cola, Entity, FieldList, FieldValue, MarkdownItem, NestedBlock,
-};
-use std::path::PathBuf;
+use crate::parser::cola_actions::{Cola, Entity, Field, FieldList, FieldValue, NestedBlock};
+use std::path::{Path, PathBuf};
 
-/// Builds a ConfigModel from a parsed Cola AST
-pub struct ModelBuilder;
+/// Builds a ConfigModel from parsed cola blocks.
+pub struct ModelBuilder {
+    model: ConfigModel,
+    path: Option<PathBuf>,
+    line_offset: u32,
+}
+
+impl Default for ModelBuilder {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
 
 impl ModelBuilder {
-    /// Convert a Cola AST to a ConfigModel
-    pub fn build_config_model(cola: &Cola) -> Result<ConfigModel, String> {
-        let mut model = ConfigModel::new();
-        let root_id = model.root_id();
-
-        if let Some(markdown_items) = cola {
-            for markdown_item in markdown_items {
-                // Ignore non-cola code blocks, headings, paragraphs.
-                if let MarkdownItem::CodeBlock(CodeBlock::ColaCodeBlock(cola_block)) = markdown_item
-                    && let Some(entities) = &cola_block.cola_syntax
-                {
-                    for entity in entities {
-                        Self::process_entity(&mut model, root_id, "", entity)?;
-                    }
-                }
-            }
+    /// Start an empty model; `path` is recorded on every location.
+    pub fn new(path: Option<&Path>) -> Self {
+        Self {
+            model: ConfigModel::new(),
+            path: path.map(Path::to_path_buf),
+            line_offset: 0,
         }
-
-        Ok(model)
     }
 
-    /// Process an entity and add it to the ConfigModel
+    /// Add the entities of one parsed block. `line_offset` is the
+    /// number of file lines above the block body's first line, so a
+    /// body line `n` is file line `n + line_offset`.
+    pub fn add_block(&mut self, cola: &Cola, line_offset: u32) -> Result<(), Error> {
+        self.line_offset = line_offset;
+        let root_id = self.model.root_id();
+        if let Some(entities) = cola {
+            for entity in entities {
+                self.process_entity(root_id, "", entity)
+                    .map_err(|message| Error::model(message, self.path.as_deref()))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The finished model.
+    pub fn finish(self) -> ConfigModel {
+        self.model
+    }
+
+    /// Convert a single parsed block to a ConfigModel, with locations
+    /// relative to that block. The incremental API above is the one to
+    /// use for literate files; see also [`crate::parse_str`].
+    pub fn build_config_model(cola: &Cola) -> Result<ConfigModel, String> {
+        let mut builder = Self::new(None);
+        builder.add_block(cola, 0).map_err(|e| e.to_string())?;
+        Ok(builder.finish())
+    }
+
+    /// A rustemo location lifted to the file's coordinates.
+    fn location(&self, loc: Option<&rustemo::Location>) -> Option<SourceLocation> {
+        let loc = loc?;
+        let (start_line, start_column) = (loc.start.line() as u32, loc.start.column() as u32);
+        let (end_line, end_column) = loc
+            .end
+            .map(|end| (end.line() as u32, end.column() as u32))
+            .unwrap_or((start_line, start_column));
+        Some(SourceLocation {
+            file_path: self.path.clone().unwrap_or_default(),
+            start_line: start_line + self.line_offset,
+            start_column,
+            end_line: end_line + self.line_offset,
+            end_column,
+        })
+    }
+
+    /// Process an entity and add it to the model.
     fn process_entity(
-        model: &mut ConfigModel,
+        &mut self,
         _parent_id: usize,
         parent_path: &str,
         entity: &Entity,
     ) -> Result<(), String> {
-        match entity {
-            Entity::SingularEntity(singular) => {
-                // Create entity path - get the identifier string
-                // We need to handle this differently since we can't directly access ValLoc fields
-                let identifier = &singular.identifier;
-                // Extract the string value
-                let entity_name = identifier.as_ref().trim();
-                let path = if parent_path.is_empty() {
-                    entity_name.to_string()
-                } else {
-                    format!("{}/{}", parent_path, entity_name)
-                };
+        let (entity_name, plural_name, location, definition) = match entity {
+            Entity::SingularEntity(singular) => (
+                singular.identifier.as_ref().trim(),
+                None,
+                self.location(singular.location.as_ref()),
+                &singular.entity_definition,
+            ),
+            Entity::PluralEntity(plural) => (
+                plural.identifier_1.as_ref().trim(),
+                Some(plural.identifier_3.as_ref().trim()),
+                self.location(plural.location.as_ref()),
+                &plural.entity_definition,
+            ),
+        };
 
-                // Extract source location from the rustemo ValLoc object
-                let location = singular.location.as_ref().map(|loc| {
-                    // Convert rustemo Location to our SourceLocation
-                    // Extract start position (line, column)
-                    let (start_line, start_column) = match &loc.start {
-                        rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                        rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
-                    };
+        let path = if parent_path.is_empty() {
+            entity_name.to_string()
+        } else {
+            format!("{parent_path}/{entity_name}")
+        };
 
-                    // Extract end position (line, column) if available
-                    let (end_line, end_column) = if let Some(end) = &loc.end {
-                        match end {
-                            rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                            rustemo::Position::Position(_) => (start_line, start_column), // Fallback
-                        }
-                    } else {
-                        (start_line, start_column) // Default to start position if end is not available
-                    };
+        let entity_id =
+            self.model
+                .create_entity_at_path(parent_path, entity_name, plural_name, location)?;
 
-                    SourceLocation {
-                        file_path: PathBuf::new(), // We may not have a file path in the Location
-                        start_line: start_line as u32,
-                        start_column: start_column as u32,
-                        end_line: end_line as u32,
-                        end_column: end_column as u32,
-                    }
-                });
-
-                // Create the entity at this path
-                let entity_id =
-                    model.create_entity_at_path(parent_path, entity_name, None, location)?;
-
-                // Process entity contents
-                Self::process_entity_definition(
-                    model,
-                    entity_id,
-                    &path,
-                    &singular.entity_definition,
-                )?;
-
-                Ok(())
-            }
-            Entity::PluralEntity(plural) => {
-                // Create entity path - extract the identifiers
-                let id1 = &plural.identifier_1;
-                let id3 = &plural.identifier_3;
-                // Extract string values
-                let entity_name = id1.as_ref().trim();
-                let plural_name = id3.as_ref().trim();
-                let path = if parent_path.is_empty() {
-                    entity_name.to_string()
-                } else {
-                    format!("{}/{}", parent_path, entity_name)
-                };
-
-                // Extract source location from the rustemo ValLoc object
-                let location = plural.location.as_ref().map(|loc| {
-                    // Convert rustemo Location to our SourceLocation
-                    // Extract start position (line, column)
-                    let (start_line, start_column) = match &loc.start {
-                        rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                        rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
-                    };
-
-                    // Extract end position (line, column) if available
-                    let (end_line, end_column) = if let Some(end) = &loc.end {
-                        match end {
-                            rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                            rustemo::Position::Position(_) => (start_line, start_column), // Fallback
-                        }
-                    } else {
-                        (start_line, start_column) // Default to start position if end is not available
-                    };
-
-                    SourceLocation {
-                        file_path: PathBuf::new(), // We may not have a file path in the Location
-                        start_line: start_line as u32,
-                        start_column: start_column as u32,
-                        end_line: end_line as u32,
-                        end_column: end_column as u32,
-                    }
-                });
-
-                // Create the entity at this path with plural name
-                let entity_id = model.create_entity_at_path(
-                    parent_path,
-                    entity_name,
-                    Some(plural_name),
-                    location,
-                )?;
-
-                // Process entity contents
-                Self::process_entity_definition(
-                    model,
-                    entity_id,
-                    &path,
-                    &plural.entity_definition,
-                )?;
-
-                Ok(())
-            }
-        }
-    }
-
-    /// Process the contents of an entity definition
-    fn process_entity_definition(
-        model: &mut ConfigModel,
-        entity_id: usize,
-        entity_path: &str,
-        entity_def: &Option<Vec<NestedBlock>>,
-    ) -> Result<(), String> {
-        if let Some(nested_blocks) = entity_def {
+        if let Some(nested_blocks) = definition {
             for nested_block in nested_blocks {
                 match nested_block {
                     NestedBlock::FieldList(field_list) => {
-                        Self::process_field_list(model, entity_id, field_list)?;
+                        self.process_field_list(entity_id, field_list)?;
                     }
                     NestedBlock::Entity(entity) => {
-                        Self::process_entity(model, entity_id, entity_path, entity)?;
+                        self.process_entity(entity_id, &path, entity)?;
                     }
                 }
             }
@@ -178,101 +131,51 @@ impl ModelBuilder {
         Ok(())
     }
 
-    /// Process a field list and add fields to the entity
+    /// Process a field list and add fields to the entity.
     fn process_field_list(
-        model: &mut ConfigModel,
+        &mut self,
         entity_id: usize,
         field_list: &FieldList,
     ) -> Result<(), String> {
         match field_list {
-            FieldList::Field(field) => {
-                Self::add_field_to_entity(model, entity_id, field)?;
-            }
-            FieldList::C2(field_list_c2) => {
-                Self::process_field_list(model, entity_id, &field_list_c2.field_list)?;
-                Self::add_field_to_entity(model, entity_id, &field_list_c2.field)?;
+            FieldList::Field(field) => self.add_field_to_entity(entity_id, field),
+            FieldList::C2(c2) => {
+                self.process_field_list(entity_id, &c2.field_list)?;
+                self.add_field_to_entity(entity_id, &c2.field)
             }
         }
-
-        Ok(())
     }
 
-    /// Add a field to an entity in the model
-    fn add_field_to_entity(
-        model: &mut ConfigModel,
-        entity_id: usize,
-        field: &crate::cola_actions::Field,
-    ) -> Result<(), String> {
-        // Extract field name from identifier
-        let id = &field.identifier;
-        let field_name = id.as_ref().trim().to_string();
-
-        // Extract source location from the field
-        let location = field.location.as_ref().map(|loc| {
-            // Convert rustemo Location to our SourceLocation
-            // Extract start position (line, column)
-            let (start_line, start_column) = match &loc.start {
-                rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                rustemo::Position::Position(_) => (1, 0), // Fallback for byte offset position
-            };
-
-            // Extract end position (line, column) if available
-            let (end_line, end_column) = if let Some(end) = &loc.end {
-                match end {
-                    rustemo::Position::LineBased(lc) => (lc.line, lc.column),
-                    rustemo::Position::Position(_) => (start_line, start_column), // Fallback
-                }
-            } else {
-                (start_line, start_column) // Default to start position if end is not available
-            };
-
-            SourceLocation {
-                file_path: PathBuf::new(), // We may not have a file path in the Location
-                start_line: start_line as u32,
-                start_column: start_column as u32,
-                end_line: end_line as u32,
-                end_column: end_column as u32,
-            }
-        });
-
-        // Pass field_value to be converted
+    /// Add a field to an entity in the model.
+    fn add_field_to_entity(&mut self, entity_id: usize, field: &Field) -> Result<(), String> {
+        let field_name = field.identifier.as_ref().trim().to_string();
+        let location = self.location(field.location.as_ref());
         let field_value = Self::convert_field_value(&field.field_value)?;
-
-        // Add field with source location to the entity
-        model.add_field_with_location(entity_id, &field_name, field_value, location)?;
-
-        Ok(())
+        self.model
+            .add_field_with_location(entity_id, &field_name, field_value, location)
     }
 
-    /// Convert a FieldValue from the AST to a ConfigValue for the model
+    /// Convert a FieldValue from the AST to a ConfigValue for the model.
     fn convert_field_value(field_value: &FieldValue) -> Result<ConfigValue, String> {
         match field_value {
-            FieldValue::QuotedStringDouble(s) => {
-                // Extract string and remove surrounding quotes
+            FieldValue::QuotedStringDouble(s) | FieldValue::QuotedStringSingle(s) => {
+                // Strip the surrounding quotes; escapes stay raw for now
+                // (see the value-language task).
                 let s_val = s.as_ref().trim();
-                let content = s_val[1..s_val.len() - 1].to_string();
-                Ok(ConfigValue::String(content))
-            }
-            FieldValue::QuotedStringSingle(s) => {
-                // Extract string and remove surrounding quotes
-                let s_val = s.as_ref().trim();
-                let content = s_val[1..s_val.len() - 1].to_string();
-                Ok(ConfigValue::String(content))
+                Ok(ConfigValue::String(s_val[1..s_val.len() - 1].to_string()))
             }
             FieldValue::Number(n) => {
                 let n_str = n.as_ref().trim();
                 if n_str.contains('.') {
-                    // Float value
-                    match n_str.parse::<f64>() {
-                        Ok(f) => Ok(ConfigValue::Float(f)),
-                        Err(_) => Err(format!("Failed to parse float: {}", n_str)),
-                    }
+                    n_str
+                        .parse::<f64>()
+                        .map(ConfigValue::Float)
+                        .map_err(|_| format!("Failed to parse float: {n_str}"))
                 } else {
-                    // Integer value
-                    match n_str.parse::<i64>() {
-                        Ok(i) => Ok(ConfigValue::Integer(i)),
-                        Err(_) => Err(format!("Failed to parse integer: {}", n_str)),
-                    }
+                    n_str
+                        .parse::<i64>()
+                        .map(ConfigValue::Integer)
+                        .map_err(|_| format!("Failed to parse integer: {n_str}"))
                 }
             }
             FieldValue::BooleanTrue => Ok(ConfigValue::Boolean(true)),

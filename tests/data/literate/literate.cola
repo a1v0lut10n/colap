@@ -1,0 +1,7 @@
+# A literate .cola file
+
+```cola
+lit:
+    name: "literate"
+;
+```

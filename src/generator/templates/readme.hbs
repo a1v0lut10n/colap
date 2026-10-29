@@ -6,17 +6,11 @@ Auto-generated configuration parser crate for {{config_filename}}.
 
 ```rust
 use {{crate_name}}::Root;
-use rustemo::Parser;
-use colap::ColaParser;
-use colap::ModelBuilder;
 
-// Parse a configuration file
+// Parse a configuration file: markdown with ```cola fences, or bare cola.
 fn parse_config() -> Root {
-    let content = std::fs::read_to_string("path/to/config.md").expect("Failed to read config file");
-    let parser = ColaParser::new();
-    let result = parser.parse(&content).expect("Failed to parse configuration");
-    let model = ModelBuilder::build_config_model(&result);
-    Root::from_model(&model)
+    let parsed = colap::parse_file("path/to/config.md").expect("Failed to parse configuration");
+    Root::from_model(&parsed.model)
 }
 
 // Access configuration values
