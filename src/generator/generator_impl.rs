@@ -9,7 +9,7 @@ use handlebars::Handlebars;
 use heck::{ToPascalCase, ToSnakeCase};
 use serde_json::json;
 
-use crate::model::config_model::{ConfigModel, ConfigNode, ConfigValue, EntityNode};
+use crate::model::config_model::{ConfigModel, ConfigValue, EntityNode};
 
 /// Generation mode for the code generator
 #[derive(Debug, Clone)]
@@ -151,7 +151,7 @@ impl CodeGenerator {
         out.push_str(&header_content);
 
         // Add necessary imports
-        out.push_str("use colap::config_model::{ConfigModel, ConfigNode, ConfigValue};\n\n");
+        out.push_str("use colap::config_model::{ConfigModel, ConfigValue};\n\n");
 
         // First identify all plural entity instances so we can skip them later
         self.identify_plural_instances(self.model.root_id());
@@ -360,19 +360,18 @@ impl CodeGenerator {
     fn identify_plural_instances(&mut self, node_id: usize) {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
-            if let ConfigNode::Entity(ent) = &*node_b {
-                // Check if this entity has a plural name
-                if let Some(_plural_name) = &ent.plural_name {
-                    // This is a plural entity, mark its children as instances
-                    for &child_id in &ent.children {
-                        self.plural_instances.insert(child_id);
-                    }
-                }
-
-                // Recursively process all children
+            let ent = &*node_b;
+            // Check if this entity has a plural name
+            if let Some(_plural_name) = &ent.plural_name {
+                // This is a plural entity, mark its children as instances
                 for &child_id in &ent.children {
-                    self.identify_plural_instances(child_id);
+                    self.plural_instances.insert(child_id);
                 }
+            }
+
+            // Recursively process all children
+            for &child_id in &ent.children {
+                self.identify_plural_instances(child_id);
             }
         }
     }
@@ -386,36 +385,34 @@ impl CodeGenerator {
     ) {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
-            if let ConfigNode::Entity(ent) = &*node_b {
-                // Check if this entity has a plural name
-                if let Some(_plural_name) = &ent.plural_name {
-                    // This is a plural entity - get first child to generate singular entity struct
-                    if !ent.children.is_empty() {
-                        let first_child_id = ent.children[0];
+            let ent = &*node_b;
+            // Check if this entity has a plural name
+            if let Some(_plural_name) = &ent.plural_name {
+                // This is a plural entity - get first child to generate singular entity struct
+                if !ent.children.is_empty() {
+                    let first_child_id = ent.children[0];
 
-                        // Use first child as template for the singular entity
-                        if let Some(first_child) = self.model.get_node(first_child_id) {
-                            let first_child_b = first_child.borrow();
-                            if let ConfigNode::Entity(_child_ent) = &*first_child_b {
-                                // Generate the singular struct from this child
-                                let singular_struct_name = self.struct_name(&ent.name);
-                                if !self.emitted_structs.contains(&singular_struct_name) {
-                                    self.emit_singular_struct(
-                                        first_child_id,
-                                        &singular_struct_name,
-                                        struct_names,
-                                        out,
-                                    );
-                                }
-                            }
+                    // Use first child as template for the singular entity
+                    if let Some(first_child) = self.model.get_node(first_child_id) {
+                        let first_child_b = first_child.borrow();
+                        let _child_ent = &*first_child_b;
+                        // Generate the singular struct from this child
+                        let singular_struct_name = self.struct_name(&ent.name);
+                        if !self.emitted_structs.contains(&singular_struct_name) {
+                            self.emit_singular_struct(
+                                first_child_id,
+                                &singular_struct_name,
+                                struct_names,
+                                out,
+                            );
                         }
                     }
                 }
+            }
 
-                // Recursively process all children
-                for &child_id in &ent.children {
-                    self.identify_and_emit_singular_entities(child_id, struct_names, out);
-                }
+            // Recursively process all children
+            for &child_id in &ent.children {
+                self.identify_and_emit_singular_entities(child_id, struct_names, out);
             }
         }
     }
@@ -434,114 +431,112 @@ impl CodeGenerator {
         // Extract fields from the entity
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
-            if let ConfigNode::Entity(ent) = &*node_b {
-                // Prepare data for template
-                let mut fields = Vec::new();
-                let mut getters = Vec::new();
-                let mut field_initializers = Vec::new();
+            let ent = &*node_b;
+            // Prepare data for template
+            let mut fields = Vec::new();
+            let mut getters = Vec::new();
+            let mut field_initializers = Vec::new();
 
-                // Process primitive fields
-                for (field_name, field_value) in &ent.fields {
-                    let field_name_snake = self.field_name(field_name);
-                    let orig_field_name = field_name.clone();
+            // Process primitive fields
+            for field in &ent.fields {
+                let (field_name, field_value) = (&field.name, &field.value);
+                let field_name_snake = self.field_name(field_name);
+                let orig_field_name = field_name.clone();
 
-                    // Determine the Rust type for this field
-                    let rust_type = match field_value {
-                        ConfigValue::Integer(_) => "i64".to_string(),
-                        ConfigValue::Float(_) => "f64".to_string(),
-                        ConfigValue::Boolean(_) => "bool".to_string(),
-                        ConfigValue::String(_) => "String".to_string(),
+                // Determine the Rust type for this field
+                let rust_type = match field_value {
+                    ConfigValue::Integer(_) => "i64".to_string(),
+                    ConfigValue::Float(_) => "f64".to_string(),
+                    ConfigValue::Boolean(_) => "bool".to_string(),
+                    ConfigValue::String(_) => "String".to_string(),
+                };
+
+                // Add field to struct
+                fields.push(json!({
+                    "name": field_name_snake,
+                    "type": rust_type,
+                    "is_optional": false
+                }));
+
+                // Add getter
+                getters.push(json!({
+                    "name": field_name_snake,
+                    "return_type": rust_type,
+                    "is_reference": false,
+                    "is_option": false,
+                    "is_primitive": true
+                }));
+
+                // Add initializer for from_entity
+                field_initializers.push(json!({
+                    "name": field_name_snake,
+                    "type": rust_type,
+                    "original_name": orig_field_name,
+                    "is_entity": false,
+                    "is_api": false
+                }));
+            }
+
+            // Process entity children
+            for &child_id in &ent.children {
+                if let Some(child) = self.model.get_node(child_id) {
+                    let child_b = child.borrow();
+                    let child_ent = &*child_b;
+                    let (field_name, field_type) = if let Some(plural) = &child_ent.plural_name {
+                        // If plural, use plural name for field and plural type
+                        (self.field_name(plural), self.struct_name(plural))
+                    } else {
+                        (
+                            self.field_name(&child_ent.name),
+                            self.struct_name(&child_ent.name),
+                        )
                     };
 
-                    // Add field to struct
+                    let original_name = child_ent.name.clone();
+                    let is_api = field_type == "Api";
+
+                    // Add field to struct (Api fields are optional)
                     fields.push(json!({
-                        "name": field_name_snake,
-                        "type": rust_type,
-                        "is_optional": false
+                        "name": field_name,
+                        "type": field_type,
+                        "is_optional": is_api
                     }));
 
                     // Add getter
                     getters.push(json!({
-                        "name": field_name_snake,
-                        "return_type": rust_type,
-                        "is_reference": false,
-                        "is_option": false,
-                        "is_primitive": true
+                        "name": field_name,
+                        "return_type": field_type,
+                        "is_reference": !is_api && !["i64", "f64", "bool", "String"].contains(&field_type.as_str()),
+                        "is_option": is_api,
+                        "is_primitive": false
                     }));
 
                     // Add initializer for from_entity
                     field_initializers.push(json!({
-                        "name": field_name_snake,
-                        "type": rust_type,
-                        "original_name": orig_field_name,
-                        "is_entity": false,
-                        "is_api": false
+                        "name": field_name,
+                        "type": field_type,
+                        "original_name": original_name,
+                        "is_entity": true,
+                        "is_api": is_api
                     }));
                 }
-
-                // Process entity children
-                for &child_id in &ent.children {
-                    if let Some(child) = self.model.get_node(child_id) {
-                        let child_b = child.borrow();
-                        if let ConfigNode::Entity(child_ent) = &*child_b {
-                            let (field_name, field_type) =
-                                if let Some(plural) = &child_ent.plural_name {
-                                    // If plural, use plural name for field and plural type
-                                    (self.field_name(plural), self.struct_name(plural))
-                                } else {
-                                    (
-                                        self.field_name(&child_ent.name),
-                                        self.struct_name(&child_ent.name),
-                                    )
-                                };
-
-                            let original_name = child_ent.name.clone();
-                            let is_api = field_type == "Api";
-
-                            // Add field to struct (Api fields are optional)
-                            fields.push(json!({
-                                "name": field_name,
-                                "type": field_type,
-                                "is_optional": is_api
-                            }));
-
-                            // Add getter
-                            getters.push(json!({
-                                "name": field_name,
-                                "return_type": field_type,
-                                "is_reference": !is_api && !["i64", "f64", "bool", "String"].contains(&field_type.as_str()),
-                                "is_option": is_api,
-                                "is_primitive": false
-                            }));
-
-                            // Add initializer for from_entity
-                            field_initializers.push(json!({
-                                "name": field_name,
-                                "type": field_type,
-                                "original_name": original_name,
-                                "is_entity": true,
-                                "is_api": is_api
-                            }));
-                        }
-                    }
-                }
-
-                // Prepare template data
-                let template_data = json!({
-                    "struct_name": struct_name,
-                    "fields": fields,
-                    "getters": getters,
-                    "field_initializers": field_initializers
-                });
-
-                // Render the template
-                let struct_content = self
-                    .handlebars
-                    .render("singular_struct", &template_data)
-                    .expect("Failed to render singular_struct template");
-
-                out.push_str(&struct_content);
             }
+
+            // Prepare template data
+            let template_data = json!({
+                "struct_name": struct_name,
+                "fields": fields,
+                "getters": getters,
+                "field_initializers": field_initializers
+            });
+
+            // Render the template
+            let struct_content = self
+                .handlebars
+                .render("singular_struct", &template_data)
+                .expect("Failed to render singular_struct template");
+
+            out.push_str(&struct_content);
         }
     }
 
@@ -561,10 +556,9 @@ impl CodeGenerator {
         // Then recursively emit its children
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
-            if let ConfigNode::Entity(ent) = &*node_b {
-                for &child_id in &ent.children {
-                    self.emit_all_entities(child_id, struct_names, out);
-                }
+            let ent = &*node_b;
+            for &child_id in &ent.children {
+                self.emit_all_entities(child_id, struct_names, out);
             }
         }
     }
@@ -573,24 +567,20 @@ impl CodeGenerator {
     fn collect_struct_names(&self, node_id: usize, map: &mut HashMap<usize, String>) {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
-            match &*node_b {
-                ConfigNode::Entity(ent) => {
-                    // Use the struct name for this entity
-                    let struct_name = self.struct_name(&ent.name);
-                    map.insert(node_id, struct_name);
+            let ent = &*node_b;
+            // Use the struct name for this entity
+            let struct_name = self.struct_name(&ent.name);
+            map.insert(node_id, struct_name);
 
-                    // Also recursively process children
-                    for &child_id in &ent.children {
-                        self.collect_struct_names(child_id, map);
-                    }
+            // Also recursively process children
+            for &child_id in &ent.children {
+                self.collect_struct_names(child_id, map);
+            }
 
-                    // For plural entities, also collect the collection wrapper
-                    if let Some(plural) = &ent.plural_name {
-                        let _plural_struct = self.struct_name(plural);
-                        // We don't need to map this to a node_id since it's synthetic
-                    }
-                }
-                ConfigNode::Field(_) => {}
+            // For plural entities, also collect the collection wrapper
+            if let Some(plural) = &ent.plural_name {
+                let _plural_struct = self.struct_name(plural);
+                // We don't need to map this to a node_id since it's synthetic
             }
         }
     }
@@ -606,167 +596,163 @@ impl CodeGenerator {
         if let Some(node) = self.model.get_node(node_id) {
             let node_b = node.borrow();
 
-            match &*node_b {
-                ConfigNode::Entity(ent) => {
-                    // For plural entities, we need to emit two structs:
-                    // 1. A singular struct (e.g., Llm) for the entity type
-                    // 2. A collection wrapper struct (e.g., Llms) with a map field
-                    if let Some(plural_name) = &ent.plural_name {
-                        // Generate the collection wrapper struct
-                        let collection_struct_name = self.struct_name(plural_name);
-                        let singular_struct_name = self.struct_name(&ent.name);
+            let ent = &*node_b;
+            // For plural entities, we need to emit two structs:
+            // 1. A singular struct (e.g., Llm) for the entity type
+            // 2. A collection wrapper struct (e.g., Llms) with a map field
+            if let Some(plural_name) = &ent.plural_name {
+                // Generate the collection wrapper struct
+                let collection_struct_name = self.struct_name(plural_name);
+                let singular_struct_name = self.struct_name(&ent.name);
 
-                        // Skip if we already emitted this wrapper struct
-                        if self.emitted_structs.contains(&collection_struct_name) {
-                            return;
-                        }
-                        self.emitted_structs.insert(collection_struct_name.clone());
+                // Skip if we already emitted this wrapper struct
+                if self.emitted_structs.contains(&collection_struct_name) {
+                    return;
+                }
+                self.emitted_structs.insert(collection_struct_name.clone());
 
-                        // Prepare the template data
-                        let template_data = json!({
-                            "struct_name": collection_struct_name,
-                            "singular_struct_name": singular_struct_name
-                        });
+                // Prepare the template data
+                let template_data = json!({
+                    "struct_name": collection_struct_name,
+                    "singular_struct_name": singular_struct_name
+                });
 
-                        // Render the template
-                        let struct_content = self
-                            .handlebars
-                            .render("plural_struct", &template_data)
-                            .expect("Failed to render plural_struct template");
+                // Render the template
+                let struct_content = self
+                    .handlebars
+                    .render("plural_struct", &template_data)
+                    .expect("Failed to render plural_struct template");
 
-                        // Add indentation if needed
-                        if indent_level > 0 {
-                            let indent = "    ".repeat(indent_level);
-                            for line in struct_content.lines() {
-                                out.push_str(&indent);
-                                out.push_str(line);
-                                out.push('\n');
-                            }
+                // Add indentation if needed
+                if indent_level > 0 {
+                    let indent = "    ".repeat(indent_level);
+                    for line in struct_content.lines() {
+                        out.push_str(&indent);
+                        out.push_str(line);
+                        out.push('\n');
+                    }
+                } else {
+                    out.push_str(&struct_content);
+                }
+
+                return;
+            }
+
+            // For regular entities or singular entities of plural collections
+            let struct_name = self.struct_name(&ent.name);
+            if self.emitted_structs.contains(&struct_name) {
+                return;
+            }
+            self.emitted_structs.insert(struct_name.clone());
+
+            // Special case for Api struct - use dedicated template
+            if struct_name == "Api" {
+                // Use the api_struct template
+                let template_data = json!({});
+
+                // Render the template
+                let struct_content = self
+                    .handlebars
+                    .render("api_struct", &template_data)
+                    .expect("Failed to render api_struct template");
+
+                // Add indentation if needed
+                if indent_level > 0 {
+                    let indent = "    ".repeat(indent_level);
+                    for line in struct_content.lines() {
+                        out.push_str(&indent);
+                        out.push_str(line);
+                        out.push('\n');
+                    }
+                } else {
+                    out.push_str(&struct_content);
+                }
+
+                return;
+            }
+
+            // For regular entity structs, use entity_struct.hbs template
+
+            // Collect field information for the template
+            let mut fields = Vec::new();
+
+            // Process primitive fields from the entity's fields map
+            for field in &ent.fields {
+                let (field_name, field_value) = (&field.name, &field.value);
+                let field_name_snake = self.field_name(field_name);
+                let original_name = field_name.clone();
+
+                // Determine the Rust type for this field
+                let rust_type = match field_value {
+                    ConfigValue::Integer(_) => "i64".to_string(),
+                    ConfigValue::Float(_) => "f64".to_string(),
+                    ConfigValue::Boolean(_) => "bool".to_string(),
+                    ConfigValue::String(_) => "String".to_string(),
+                };
+
+                fields.push(json!({
+                    "name": field_name_snake,
+                    "type": rust_type,
+                    "original_name": original_name,
+                    "optional": false
+                }));
+            }
+
+            // Process entity children as fields (relationships)
+            for child_id in ent.children.clone() {
+                if let Some(child_node) = self.model.get_node(child_id) {
+                    let child_node_b = child_node.borrow();
+                    let child_ent = &*child_node_b;
+                    let (field_name, field_type, is_plural) =
+                        if let Some(plural) = &child_ent.plural_name {
+                            // If plural, use plural name for field and plural type
+                            (self.field_name(plural), self.struct_name(plural), true)
                         } else {
-                            out.push_str(&struct_content);
-                        }
-
-                        return;
-                    }
-
-                    // For regular entities or singular entities of plural collections
-                    let struct_name = self.struct_name(&ent.name);
-                    if self.emitted_structs.contains(&struct_name) {
-                        return;
-                    }
-                    self.emitted_structs.insert(struct_name.clone());
-
-                    // Special case for Api struct - use dedicated template
-                    if struct_name == "Api" {
-                        // Use the api_struct template
-                        let template_data = json!({});
-
-                        // Render the template
-                        let struct_content = self
-                            .handlebars
-                            .render("api_struct", &template_data)
-                            .expect("Failed to render api_struct template");
-
-                        // Add indentation if needed
-                        if indent_level > 0 {
-                            let indent = "    ".repeat(indent_level);
-                            for line in struct_content.lines() {
-                                out.push_str(&indent);
-                                out.push_str(line);
-                                out.push('\n');
-                            }
-                        } else {
-                            out.push_str(&struct_content);
-                        }
-
-                        return;
-                    }
-
-                    // For regular entity structs, use entity_struct.hbs template
-
-                    // Collect field information for the template
-                    let mut fields = Vec::new();
-
-                    // Process primitive fields from the entity's fields map
-                    for (field_name, field_value) in &ent.fields {
-                        let field_name_snake = self.field_name(field_name);
-                        let original_name = field_name.clone();
-
-                        // Determine the Rust type for this field
-                        let rust_type = match field_value {
-                            ConfigValue::Integer(_) => "i64".to_string(),
-                            ConfigValue::Float(_) => "f64".to_string(),
-                            ConfigValue::Boolean(_) => "bool".to_string(),
-                            ConfigValue::String(_) => "String".to_string(),
+                            (
+                                self.field_name(&child_ent.name),
+                                self.struct_name(&child_ent.name),
+                                false,
+                            )
                         };
 
-                        fields.push(json!({
-                            "name": field_name_snake,
-                            "type": rust_type,
-                            "original_name": original_name,
-                            "optional": false
-                        }));
-                    }
+                    let original_name = self.to_original_case(&field_name);
+                    let is_api = field_type == "Api";
 
-                    // Process entity children as fields (relationships)
-                    for child_id in ent.children.clone() {
-                        if let Some(child_node) = self.model.get_node(child_id) {
-                            let child_node_b = child_node.borrow();
-                            if let ConfigNode::Entity(child_ent) = &*child_node_b {
-                                let (field_name, field_type, is_plural) =
-                                    if let Some(plural) = &child_ent.plural_name {
-                                        // If plural, use plural name for field and plural type
-                                        (self.field_name(plural), self.struct_name(plural), true)
-                                    } else {
-                                        (
-                                            self.field_name(&child_ent.name),
-                                            self.struct_name(&child_ent.name),
-                                            false,
-                                        )
-                                    };
-
-                                let original_name = self.to_original_case(&field_name);
-                                let is_api = field_type == "Api";
-
-                                fields.push(json!({
-                                    "name": field_name,
-                                    "type": field_type,
-                                    "original_name": original_name,
-                                    "optional": !is_api,
-                                    "is_entity": true,
-                                    "is_api": is_api,
-                                    "is_plural": is_plural
-                                }));
-                            }
-                        }
-                    }
-
-                    // Prepare the template data
-                    let template_data = json!({
-                        "struct_name": struct_name,
-                        "fields": fields,
-                        "model_import": "colap::model::config_model"
-                    });
-
-                    // Render the template
-                    let struct_content = self
-                        .handlebars
-                        .render("entity_struct", &template_data)
-                        .expect("Failed to render entity_struct template");
-
-                    // Add indentation if needed
-                    if indent_level > 0 {
-                        let indent = "    ".repeat(indent_level);
-                        for line in struct_content.lines() {
-                            out.push_str(&indent);
-                            out.push_str(line);
-                            out.push('\n');
-                        }
-                    } else {
-                        out.push_str(&struct_content);
-                    }
+                    fields.push(json!({
+                        "name": field_name,
+                        "type": field_type,
+                        "original_name": original_name,
+                        "optional": !is_api,
+                        "is_entity": true,
+                        "is_api": is_api,
+                        "is_plural": is_plural
+                    }));
                 }
-                ConfigNode::Field(_) => {}
+            }
+
+            // Prepare the template data
+            let template_data = json!({
+                "struct_name": struct_name,
+                "fields": fields,
+                "model_import": "colap::model::config_model"
+            });
+
+            // Render the template
+            let struct_content = self
+                .handlebars
+                .render("entity_struct", &template_data)
+                .expect("Failed to render entity_struct template");
+
+            // Add indentation if needed
+            if indent_level > 0 {
+                let indent = "    ".repeat(indent_level);
+                for line in struct_content.lines() {
+                    out.push_str(&indent);
+                    out.push_str(line);
+                    out.push('\n');
+                }
+            } else {
+                out.push_str(&struct_content);
             }
         }
     }

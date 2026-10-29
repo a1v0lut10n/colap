@@ -17,8 +17,8 @@ impl {{struct_name}} {
         {{#if (eq type "String")}} {{!-- Handle String fields as primitives, not entities --}}
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let colap::model::config_model::ConfigNode::Entity(ent) = &*node_b {
-                if let Some(val) = ent.fields.get("{{original_name}}") {
+            {
+                if let Some(val) = node_b.field_value("{{original_name}}") {
                     if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.{{name}} = s.clone();
                     }
@@ -37,8 +37,8 @@ impl {{struct_name}} {
         {{else}}
         if let Some(node) = model.get_node(id) {
             let node_b = node.borrow();
-            if let colap::model::config_model::ConfigNode::Entity(ent) = &*node_b {
-                if let Some(val) = ent.fields.get("{{original_name}}") {
+            {
+                if let Some(val) = node_b.field_value("{{original_name}}") {
                     {{#if (eq type "String")}}
                     if let colap::model::config_model::ConfigValue::String(s) = val {
                         result.{{name}} = s.clone();

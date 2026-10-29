@@ -2,11 +2,13 @@
 //! colap's error type.
 //!
 //! Every error names the file it came from when one is known, and a
-//! parse error carries the line and column *in that file* — not in the
-//! extracted fence body the grammar actually saw. `Display` is the
+//! located error carries the line and column *in that file* — not in
+//! the extracted fence body the grammar actually saw. `Display` is the
 //! editor-friendly `path:line:col: message` form, with 1-based lines
-//! and columns.
+//! and columns. Several errors from one parse come back together as
+//! [`Error::Multiple`], sorted by line.
 
+use crate::model::config_model::ModelError;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -21,16 +23,19 @@ pub enum Error {
         column: u32,
         message: String,
     },
-    /// The input parsed but does not make a consistent model.
+    /// The input parsed but does not make a consistent model: a
+    /// duplicate, or a value the model cannot hold.
     Model {
         path: Option<PathBuf>,
-        message: String,
+        error: Box<ModelError>,
     },
     /// The file could not be read.
     Io {
         path: PathBuf,
         source: std::io::Error,
     },
+    /// Several errors, in line order.
+    Multiple(Vec<Error>),
 }
 
 impl Error {
@@ -67,10 +72,10 @@ impl Error {
         }
     }
 
-    pub(crate) fn model(message: String, path: Option<&Path>) -> Self {
+    pub(crate) fn model(error: ModelError, path: Option<&Path>) -> Self {
         Error::Model {
             path: path.map(Path::to_path_buf),
-            message,
+            error: Box::new(error),
         }
     }
 
@@ -79,8 +84,47 @@ impl Error {
         match self {
             Error::Parse { path, .. } | Error::Model { path, .. } => path.as_deref(),
             Error::Io { path, .. } => Some(path),
+            Error::Multiple(errors) => errors.first().and_then(Error::path),
         }
     }
+
+    /// The 1-based line the error is reported at, when it has one.
+    pub fn line(&self) -> Option<u32> {
+        match self {
+            Error::Parse { line, .. } => Some(*line),
+            Error::Model { error, .. } => error.location().map(|loc| loc.start_line),
+            Error::Io { .. } => None,
+            Error::Multiple(errors) => errors.first().and_then(Error::line),
+        }
+    }
+
+    /// Every individual error, flattening [`Error::Multiple`].
+    pub fn each(&self) -> Box<dyn Iterator<Item = &Error> + '_> {
+        match self {
+            Error::Multiple(errors) => Box::new(errors.iter().flat_map(Error::each)),
+            single => Box::new(std::iter::once(single)),
+        }
+    }
+
+    /// Fold collected errors into one: none is `Ok`, one is itself,
+    /// more are [`Error::Multiple`] sorted by line.
+    pub(crate) fn collect(mut errors: Vec<Error>) -> Result<(), Error> {
+        match errors.len() {
+            0 => Ok(()),
+            1 => Err(errors.remove(0)),
+            _ => {
+                errors.sort_by_key(|e| e.line().unwrap_or(0));
+                Err(Error::Multiple(errors))
+            }
+        }
+    }
+}
+
+fn write_path(f: &mut fmt::Formatter<'_>, path: &Option<PathBuf>, sep: &str) -> fmt::Result {
+    if let Some(path) = path {
+        write!(f, "{}{sep}", path.display())?;
+    }
+    Ok(())
 }
 
 impl fmt::Display for Error {
@@ -92,18 +136,29 @@ impl fmt::Display for Error {
                 column,
                 message,
             } => {
-                if let Some(path) = path {
-                    write!(f, "{}:", path.display())?;
-                }
+                write_path(f, path, ":")?;
                 write!(f, "{line}:{column}: {message}")
             }
-            Error::Model { path, message } => {
-                if let Some(path) = path {
-                    write!(f, "{}: ", path.display())?;
+            Error::Model { path, error } => match error.location() {
+                Some(loc) => {
+                    write_path(f, path, ":")?;
+                    write!(f, "{}:{}: {error}", loc.start_line, loc.start_column + 1)
                 }
-                write!(f, "{message}")
-            }
+                None => {
+                    write_path(f, path, ": ")?;
+                    write!(f, "{error}")
+                }
+            },
             Error::Io { path, source } => write!(f, "{}: {source}", path.display()),
+            Error::Multiple(errors) => {
+                for (i, error) in errors.iter().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "{error}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -112,6 +167,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Io { source, .. } => Some(source),
+            Error::Model { error, .. } => Some(error.as_ref()),
             _ => None,
         }
     }

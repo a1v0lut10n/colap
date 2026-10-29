@@ -7,9 +7,14 @@
 //! [`ModelBuilder::add_block`] per block with the block's line offset
 //! in the file, then [`ModelBuilder::finish`]. Every
 //! [`SourceLocation`] it records points into the original file.
+//!
+//! The builder does not stop at the first problem. Every duplicate the
+//! model rejects is recorded (a rejected entity's subtree is skipped)
+//! and `finish` returns them all, so one file read reports every
+//! error in it.
 
 use crate::error::Error;
-use crate::model::config_model::{ConfigModel, ConfigValue};
+use crate::model::config_model::{ConfigModel, ConfigValue, ModelError, NodeId};
 use crate::model::source_location::SourceLocation;
 use crate::parser::cola_actions::{Cola, Entity, Field, FieldList, FieldValue, NestedBlock};
 use std::path::{Path, PathBuf};
@@ -19,6 +24,7 @@ pub struct ModelBuilder {
     model: ConfigModel,
     path: Option<PathBuf>,
     line_offset: u32,
+    errors: Vec<Error>,
 }
 
 impl Default for ModelBuilder {
@@ -34,27 +40,39 @@ impl ModelBuilder {
             model: ConfigModel::new(),
             path: path.map(Path::to_path_buf),
             line_offset: 0,
+            errors: Vec::new(),
         }
     }
 
     /// Add the entities of one parsed block. `line_offset` is the
     /// number of file lines above the block body's first line, so a
-    /// body line `n` is file line `n + line_offset`.
-    pub fn add_block(&mut self, cola: &Cola, line_offset: u32) -> Result<(), Error> {
+    /// body line `n` is file line `n + line_offset`. Problems are
+    /// recorded, not returned; see [`ModelBuilder::finish`].
+    pub fn add_block(&mut self, cola: &Cola, line_offset: u32) {
         self.line_offset = line_offset;
         let root_id = self.model.root_id();
         if let Some(entities) = cola {
             for entity in entities {
-                self.process_entity(root_id, "", entity)
-                    .map_err(|message| Error::model(message, self.path.as_deref()))?;
+                self.process_entity(root_id, entity);
             }
         }
-        Ok(())
     }
 
-    /// The finished model.
-    pub fn finish(self) -> ConfigModel {
-        self.model
+    /// Record an error found outside the builder, such as a block that
+    /// did not parse, so that `finish` reports it with the others.
+    pub fn record(&mut self, error: Error) {
+        self.errors.push(error);
+    }
+
+    /// The errors recorded so far.
+    pub fn errors(&self) -> &[Error] {
+        &self.errors
+    }
+
+    /// The finished model, or every error recorded while building it.
+    pub fn finish(self) -> Result<ConfigModel, Error> {
+        Error::collect(self.errors)?;
+        Ok(self.model)
     }
 
     /// Convert a single parsed block to a ConfigModel, with locations
@@ -62,8 +80,8 @@ impl ModelBuilder {
     /// use for literate files; see also [`crate::parse_str`].
     pub fn build_config_model(cola: &Cola) -> Result<ConfigModel, String> {
         let mut builder = Self::new(None);
-        builder.add_block(cola, 0).map_err(|e| e.to_string())?;
-        Ok(builder.finish())
+        builder.add_block(cola, 0);
+        builder.finish().map_err(|e| e.to_string())
     }
 
     /// A rustemo location lifted to the file's coordinates.
@@ -83,13 +101,12 @@ impl ModelBuilder {
         })
     }
 
+    fn reject(&mut self, error: ModelError) {
+        self.errors.push(Error::model(error, self.path.as_deref()));
+    }
+
     /// Process an entity and add it to the model.
-    fn process_entity(
-        &mut self,
-        _parent_id: usize,
-        parent_path: &str,
-        entity: &Entity,
-    ) -> Result<(), String> {
+    fn process_entity(&mut self, parent_id: NodeId, entity: &Entity) {
         let (entity_name, plural_name, location, definition) = match entity {
             Entity::SingularEntity(singular) => (
                 singular.identifier.as_ref().trim(),
@@ -105,54 +122,61 @@ impl ModelBuilder {
             ),
         };
 
-        let path = if parent_path.is_empty() {
-            entity_name.to_string()
-        } else {
-            format!("{parent_path}/{entity_name}")
+        let entity_id = match self
+            .model
+            .add_entity(parent_id, entity_name, plural_name, location)
+        {
+            Ok(id) => id,
+            Err(error) => {
+                // A rejected entity takes its subtree with it: there is
+                // no node to attach the contents to.
+                self.reject(error);
+                return;
+            }
         };
-
-        let entity_id =
-            self.model
-                .create_entity_at_path(parent_path, entity_name, plural_name, location)?;
 
         if let Some(nested_blocks) = definition {
             for nested_block in nested_blocks {
                 match nested_block {
                     NestedBlock::FieldList(field_list) => {
-                        self.process_field_list(entity_id, field_list)?;
+                        self.process_field_list(entity_id, field_list);
                     }
                     NestedBlock::Entity(entity) => {
-                        self.process_entity(entity_id, &path, entity)?;
+                        self.process_entity(entity_id, entity);
                     }
                 }
             }
         }
-
-        Ok(())
     }
 
     /// Process a field list and add fields to the entity.
-    fn process_field_list(
-        &mut self,
-        entity_id: usize,
-        field_list: &FieldList,
-    ) -> Result<(), String> {
+    fn process_field_list(&mut self, entity_id: NodeId, field_list: &FieldList) {
         match field_list {
             FieldList::Field(field) => self.add_field_to_entity(entity_id, field),
             FieldList::C2(c2) => {
-                self.process_field_list(entity_id, &c2.field_list)?;
-                self.add_field_to_entity(entity_id, &c2.field)
+                self.process_field_list(entity_id, &c2.field_list);
+                self.add_field_to_entity(entity_id, &c2.field);
             }
         }
     }
 
     /// Add a field to an entity in the model.
-    fn add_field_to_entity(&mut self, entity_id: usize, field: &Field) -> Result<(), String> {
+    fn add_field_to_entity(&mut self, entity_id: NodeId, field: &Field) {
         let field_name = field.identifier.as_ref().trim().to_string();
         let location = self.location(field.location.as_ref());
-        let field_value = Self::convert_field_value(&field.field_value)?;
-        self.model
-            .add_field_with_location(entity_id, &field_name, field_value, location)
+        let field_value = match Self::convert_field_value(&field.field_value) {
+            Ok(value) => value,
+            Err(message) => {
+                self.reject(ModelError::InvalidValue { message, location });
+                return;
+            }
+        };
+        if let Err(error) = self
+            .model
+            .add_field(entity_id, &field_name, field_value, location)
+        {
+            self.reject(error);
+        }
     }
 
     /// Convert a FieldValue from the AST to a ConfigValue for the model.
