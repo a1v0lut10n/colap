@@ -2,7 +2,7 @@
 date: 2026-10-29
 type: task
 ticket: COLA-0004
-status: in-progress
+status: done
 affects:
   - README.md
   - src/model/config_model.rs
@@ -54,11 +54,26 @@ them is unchanged (escapes are not decoded yet).
 
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] Every parsing fixture round-trips and is idempotent under `fmt`.
-- [ ] `colap fmt --check` on a freshly formatted file exits 0.
-- [ ] `aivolution lint .` clean; README updated; journal entry proposed.
+- [x] The three Rust gates are clean (73 tests; 5 new in `tests/fmt.rs`,
+      3 in `canonical.rs`).
+- [x] Every clean fixture round-trips (parse → format → parse gives an
+      equal model) and is idempotent under `fmt`.
+- [x] `colap fmt --check` on a freshly formatted file exits 0; on the messy
+      fixture it names the block's fence line and exits 1.
+- [x] `aivolution lint .` clean; README updated; journal entry proposed.
 
 ## Outcome
 
-(filled in before the change proposal)
+Built as planned. Notes beyond the action items:
+
+- `ConfigValue`'s `Display` now prints floats with a decimal point too,
+  so the model's own text rendering agrees with the writer and the
+  round-trip test can compare models by it.
+- `format_literate_str` runs the whole-file check first, then formats
+  each block through its own one-block model; a block body at the end of
+  an unterminated fence gains its final newline.
+- The width rule counts characters, not bytes, so non-ASCII strings do
+  not change the layout decision.
+- The round-trip test chooses the literate path for `.md` files
+  explicitly: dialect detection on a markdown file with no cola fence is
+  bare cola by design.

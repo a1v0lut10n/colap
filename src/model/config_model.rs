@@ -36,7 +36,7 @@ impl fmt::Display for ConfigValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ConfigValue::Integer(i) => write!(f, "{}", i),
-            ConfigValue::Float(fl) => write!(f, "{}", fl),
+            ConfigValue::Float(fl) => write!(f, "{}", crate::model::canonical::float_text(*fl)),
             ConfigValue::Boolean(b) => write!(f, "{}", b),
             ConfigValue::String(s) => write!(f, "\"{}\"", s),
         }
