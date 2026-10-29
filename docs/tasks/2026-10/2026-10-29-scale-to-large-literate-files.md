@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: planned
+status: done
 affects: []
 tags: [performance, model]
 ---
@@ -44,3 +44,12 @@ fields, is fast and linear. A benchmark guards it.
 Before setting `status: done`:
 - the benchmark runs in CI or is documented as a manual gate;
 - a journal entry links back to this task with the numbers.
+
+## Completion note
+
+Done across three tickets: COLA-0002 built entities by parent id with a
+per-entity name index, COLA-0004 made the ordered field list the only
+field storage, and COLA-0006 added `benches/scale.rs` (run by CI) with
+the numbers before and after. The build was quadratic only for entities
+nested under keyed entries; a flat ledger was already linear. Parsing
+is now 94% of a reading, at about 40 µs per entry.
