@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: in-progress
+status: done
 affects:
   - README.md
 tags: [language-design, grammar, values]
@@ -72,5 +72,8 @@ Before setting `status: done`:
 Decided in `docs/design/2026-10-30-value-language.md` (accepted
 2026-10-30). COLA-0007 implemented every value form: symbols, lists,
 references, decoded escapes and block strings, number separators and
-exponents, trailing commas. Comments are the one deliverable left, in
-their own ticket, because the model has to carry them through `fmt`.
+exponents, trailing commas. Comments followed in COLA-0009
+(`docs/implementation/2026-10/2026-10-30-cola-0009-comments.md`):
+found with the highlighter's lexer, attached to the model by position,
+written back by `fmt`. Spec and README match the grammar; the journal
+entries of 2026-10-30 link back here.

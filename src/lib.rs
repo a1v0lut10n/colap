@@ -133,7 +133,7 @@ pub fn check_literate_str(text: &str, path: Option<&Path>) -> Report {
         // A block that does not parse is recorded and the next one is
         // still read, so one bad block does not hide the rest.
         match cola::ColaParser::new().parse(&block.body) {
-            Ok(ast) => builder.add_block(&ast, line_offset),
+            Ok(ast) => builder.add_block(&ast, &block.body, line_offset),
             Err(e) => builder.record(Error::from_rustemo(e, path, line_offset)),
         }
     }
@@ -144,7 +144,7 @@ pub fn check_literate_str(text: &str, path: Option<&Path>) -> Report {
 pub fn check_cola_str(text: &str, path: Option<&Path>) -> Report {
     let mut builder = ModelBuilder::new(path);
     match cola::ColaParser::new().parse(text) {
-        Ok(ast) => builder.add_block(&ast, 0),
+        Ok(ast) => builder.add_block(&ast, text, 0),
         Err(e) => builder.record(Error::from_rustemo(e, path, 0)),
     }
     finish(builder, path, Vec::new())

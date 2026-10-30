@@ -56,12 +56,28 @@ impl fmt::Display for ConfigValue {
     }
 }
 
+/// The `//` comments attached to one item: those on their own lines
+/// before it, and the one after it on its line. Each holds the text
+/// after `//` as written, trailing whitespace trimmed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Comments {
+    pub leading: Vec<String>,
+    pub trailing: Option<String>,
+}
+
+impl Comments {
+    pub fn is_empty(&self) -> bool {
+        self.leading.is_empty() && self.trailing.is_none()
+    }
+}
+
 /// A field of an entity: its name, value and where it was set.
 #[derive(Debug, Clone)]
 pub struct ConfigField {
     pub name: String,
     pub value: ConfigValue,
     pub location: Option<SourceLocation>,
+    pub comments: Comments,
 }
 
 /// What a name in an entity's namespace refers to.
@@ -87,6 +103,11 @@ pub struct EntityNode {
     pub fields: Vec<ConfigField>,
     /// Where the entity was first opened
     pub location: Option<SourceLocation>,
+    /// Comments on the header: before it, and after its `:`.
+    pub comments: Comments,
+    /// Comments on the close: before the `;`, and after it. On the root
+    /// entity, `leading` holds the comments at the end of a block.
+    pub closing: Comments,
     /// Every name taken in this entity: fields, children by singular and
     /// by plural name. One namespace.
     names: HashMap<String, Member>,
@@ -106,6 +127,8 @@ impl EntityNode {
             children: Vec::new(),
             fields: Vec::new(),
             location,
+            comments: Comments::default(),
+            closing: Comments::default(),
             names: HashMap::new(),
         }
     }
@@ -462,6 +485,7 @@ impl ConfigModel {
                     name: name.to_string(),
                     value,
                     location,
+                    comments: Comments::default(),
                 });
                 node.names.insert(name.to_string(), Member::Field(index));
                 Ok(())

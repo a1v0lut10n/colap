@@ -13,9 +13,13 @@
 //! - a list fits on its field's line or has one element per line,
 //!   each ending in `,`, with `]` at the field's indentation;
 //! - a string with a newline is a `"""` block when that reads back
-//!   exactly, otherwise a quoted one-liner; see [`literal`].
+//!   exactly, otherwise a quoted one-liner; see [`literal`];
+//! - leading comments stand on their own lines at their item's
+//!   indentation, a trailing comment follows the item on its line after
+//!   one space; an entity whose header, fields or close carry a comment
+//!   is never written on one line, though a comment after its `;` is.
 
-use crate::model::config_model::{ConfigModel, ConfigValue, NodeId};
+use crate::model::config_model::{Comments, ConfigModel, ConfigValue, NodeId};
 use crate::model::literal;
 
 pub use crate::model::literal::{float_text, quote};
@@ -44,9 +48,31 @@ fn fits(line: &str) -> bool {
     line.chars().count() <= WIDTH
 }
 
-/// A field on its own line at `depth`, with its trailing comma.
-fn field_lines(name: &str, value: &ConfigValue, depth: usize, out: &mut String) {
+fn trailing(comments: &Comments) -> String {
+    comments
+        .trailing
+        .as_ref()
+        .map(|c| format!(" //{c}"))
+        .unwrap_or_default()
+}
+
+fn leading_lines(comments: &Comments, indent: &str, out: &mut String) {
+    for c in &comments.leading {
+        out.push_str(&format!("{indent}//{c}\n"));
+    }
+}
+
+/// A field on its own line at `depth`, with its trailing comma, between
+/// its comments.
+fn field_lines(
+    name: &str,
+    value: &ConfigValue,
+    comments: &Comments,
+    depth: usize,
+    out: &mut String,
+) {
     let indent = INDENT.repeat(depth);
+    leading_lines(comments, &indent, out);
     let one_line = format!("{indent}{name}: {},", value_text(value));
     match value {
         ConfigValue::List(items) if !items.is_empty() && !fits(&one_line) => {
@@ -55,20 +81,16 @@ fn field_lines(name: &str, value: &ConfigValue, depth: usize, out: &mut String) 
             for item in items {
                 out.push_str(&format!("{inner}{},\n", value_text(item)));
             }
-            out.push_str(&format!("{indent}],\n"));
+            out.push_str(&format!("{indent}],"));
         }
         ConfigValue::String(s) if s.contains('\n') => match literal::block(s, &indent, INDENT) {
-            Some(block) => out.push_str(&format!("{indent}{name}: {block},\n")),
-            None => {
-                out.push_str(&one_line);
-                out.push('\n');
-            }
+            Some(block) => out.push_str(&format!("{indent}{name}: {block},")),
+            None => out.push_str(&one_line),
         },
-        _ => {
-            out.push_str(&one_line);
-            out.push('\n');
-        }
+        _ => out.push_str(&one_line),
     }
+    out.push_str(&trailing(comments));
+    out.push('\n');
 }
 
 fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String) {
@@ -77,9 +99,14 @@ fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String)
     };
     let entity = node.borrow();
     let indent = INDENT.repeat(depth);
+    leading_lines(&entity.comments, &indent, out);
     let header = format!("{}:", entity.declaration());
+    let after_close = trailing(&entity.closing);
 
-    if entity.children.is_empty() {
+    let commented = entity.comments.trailing.is_some()
+        || !entity.closing.leading.is_empty()
+        || entity.fields.iter().any(|f| !f.comments.is_empty());
+    if entity.children.is_empty() && !commented {
         let fields: Vec<String> = entity
             .fields
             .iter()
@@ -92,6 +119,7 @@ fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String)
         };
         if fits(&one_line) && !entity.fields.iter().any(|f| has_newline(&f.value)) {
             out.push_str(&one_line);
+            out.push_str(&after_close);
             out.push('\n');
             return;
         }
@@ -99,15 +127,19 @@ fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String)
 
     out.push_str(&indent);
     out.push_str(&header);
+    out.push_str(&trailing(&entity.comments));
     out.push('\n');
     for field in &entity.fields {
-        field_lines(&field.name, &field.value, depth + 1, out);
+        field_lines(&field.name, &field.value, &field.comments, depth + 1, out);
     }
     for &child in &entity.children {
         write_entity(model, child, depth + 1, out);
     }
+    leading_lines(&entity.closing, &INDENT.repeat(depth + 1), out);
     out.push_str(&indent);
-    out.push_str(";\n");
+    out.push(';');
+    out.push_str(&after_close);
+    out.push('\n');
 }
 
 /// Whether the one-line form of the value would hold a newline, which
@@ -118,13 +150,16 @@ fn has_newline(value: &ConfigValue) -> bool {
 
 impl ConfigModel {
     /// The model in canonical cola, as one block body: every root
-    /// entity in order, no fences. Empty for an empty model.
+    /// entity in order, then the comments at the end of the block, no
+    /// fences. Empty for an empty model.
     pub fn to_cola(&self) -> String {
         let mut out = String::new();
         if let Some(root) = self.get_node(self.root_id()) {
-            for &child in &root.borrow().children {
+            let root = root.borrow();
+            for &child in &root.children {
                 write_entity(self, child, 0, &mut out);
             }
+            leading_lines(&root.closing, "", &mut out);
         }
         out
     }
@@ -196,6 +231,45 @@ mod tests {
             "{text}"
         );
         assert!(text.ends_with("        element-11,\n    ],\n;\n"), "{text}");
+    }
+
+    #[test]
+    fn comments_take_their_places_and_forbid_the_one_line_form() {
+        let mut model = ConfigModel::new();
+        let root = model.root_id();
+        let a = model.add_entity(root, "a", None, None).unwrap();
+        model
+            .add_field_to_entity(a, "x", ConfigValue::Integer(1))
+            .unwrap();
+        model
+            .add_field_to_entity(a, "y", ConfigValue::Integer(2))
+            .unwrap();
+        {
+            let node = model.get_node(a).unwrap();
+            let mut node = node.borrow_mut();
+            node.comments.leading.push(" about a".into());
+            node.comments.trailing = Some(" header".into());
+            node.fields[0].comments.trailing = Some(" one".into());
+            node.fields[1].comments.leading.push(" two".into());
+            node.closing.leading.push(" done".into());
+            node.closing.trailing = Some(" closed".into());
+        }
+        let b = model.add_entity(root, "b", None, None).unwrap();
+        model
+            .add_field_to_entity(b, "x", ConfigValue::Integer(1))
+            .unwrap();
+        model.get_node(b).unwrap().borrow_mut().closing.trailing = Some(" short".into());
+        model
+            .get_node(root)
+            .unwrap()
+            .borrow_mut()
+            .closing
+            .leading
+            .push(" end of block".into());
+        assert_eq!(
+            model.to_cola(),
+            "// about a\na: // header\n    x: 1, // one\n    // two\n    y: 2,\n    // done\n; // closed\nb: x: 1; // short\n// end of block\n"
+        );
     }
 
     #[test]

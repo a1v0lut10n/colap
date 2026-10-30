@@ -82,6 +82,7 @@ llm plural llms:
 | Curly brace clutter          | 👍 Minimal     | 😩 Lots       | 👍 Minimal    | ✅ Minimal     |
 | Trailing commas allowed      | ❌ No          | ❌ No         | ✅ Yes        | ✅ Yes         |
 | Multi-line strings           | 🤔 Hard        | 😕 Escapes    | ✅ Easy       | ✅ Easy        |
+| Comments                     | ✅ `#`         | ❌ None       | ✅ `#`        | ✅ `//`, kept by `fmt` |
 | Collections (arrays/maps)    | 😕 Indents     | 😩 `[]`, `{}` | 😕 Mixed      | ✅ `[]` lists, infix `plural` maps |
 | Markdown embedding           | ❌ Awkward     | ❌ Awkward    | ❌ Awkward    | ✅ First-class |
 
@@ -90,7 +91,7 @@ llm plural llms:
 The language is specified in [`docs/spec/cola.md`](docs/spec/cola.md), a
 literate document that colap itself checks; a conformance corpus under
 `tests/conformance/` holds the parser, the diagnostics and the highlighter to
-it. Comments are the one open decision listed there.
+it. Schemas are the one open decision listed there.
 
 ---
 
@@ -140,6 +141,8 @@ model plural models:
   separators and exponents, booleans, bare symbols (`basis: parsed`), lists
   (`tags: [a, "b", 3]`) and references (`@claims/cl-1`) that `colap check`
   resolves
+- `//` comments inside cola blocks, kept in the model and written back in
+  place by `colap fmt`
 - Reads large files in linear time: a 10k-entry ledger (5 MB) in about
   0.4 s; `cargo bench --bench scale` guards it
 
