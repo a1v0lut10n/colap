@@ -66,6 +66,10 @@ impl CodeGenerator {
         handlebars
             .register_template_string("cargo_toml", include_str!("templates/cargo_toml.hbs"))?;
         handlebars.register_template_string("readme", include_str!("templates/readme.hbs"))?;
+        handlebars.register_partial("list_items", include_str!("templates/list_items.hbs"))?;
+        // The templates produce Rust, not HTML: `Vec<String>` must not
+        // become `Vec&lt;String&gt;`.
+        handlebars.register_escape_fn(handlebars::no_escape);
 
         // Enable built-in helpers
         handlebars.set_strict_mode(false);
@@ -444,12 +448,7 @@ impl CodeGenerator {
                 let orig_field_name = field_name.clone();
 
                 // Determine the Rust type for this field
-                let rust_type = match field_value {
-                    ConfigValue::Integer(_) => "i64".to_string(),
-                    ConfigValue::Float(_) => "f64".to_string(),
-                    ConfigValue::Boolean(_) => "bool".to_string(),
-                    ConfigValue::String(_) => "String".to_string(),
-                };
+                let (rust_type, element) = rust_type(field_value);
 
                 // Add field to struct
                 fields.push(json!({
@@ -473,7 +472,9 @@ impl CodeGenerator {
                     "type": rust_type,
                     "original_name": orig_field_name,
                     "is_entity": false,
-                    "is_api": false
+                    "is_api": false,
+                    "is_list": element.is_some(),
+                    "element": element
                 }));
             }
 
@@ -683,18 +684,15 @@ impl CodeGenerator {
                 let original_name = field_name.clone();
 
                 // Determine the Rust type for this field
-                let rust_type = match field_value {
-                    ConfigValue::Integer(_) => "i64".to_string(),
-                    ConfigValue::Float(_) => "f64".to_string(),
-                    ConfigValue::Boolean(_) => "bool".to_string(),
-                    ConfigValue::String(_) => "String".to_string(),
-                };
+                let (rust_type, element) = rust_type(field_value);
 
                 fields.push(json!({
                     "name": field_name_snake,
                     "type": rust_type,
                     "original_name": original_name,
-                    "optional": false
+                    "optional": false,
+                    "is_list": element.is_some(),
+                    "element": element
                 }));
             }
 
@@ -805,5 +803,29 @@ impl CodeGenerator {
         // within the same project. In a real implementation, you would use
         // a better approach to generate a relative path that works for tests.
         self.source_path.to_string_lossy().replace('\\', "/")
+    }
+}
+
+/// The Rust type a value is read into and, for a list, its element
+/// type: the type of the elements when they all share one, otherwise
+/// `ConfigValue` itself.
+fn rust_type(value: &ConfigValue) -> (String, Option<String>) {
+    let scalar = |value: &ConfigValue| match value {
+        ConfigValue::Integer(_) => "i64",
+        ConfigValue::Float(_) => "f64",
+        ConfigValue::Boolean(_) => "bool",
+        ConfigValue::String(_) | ConfigValue::Symbol(_) | ConfigValue::Reference(_) => "String",
+        ConfigValue::List(_) => "colap::model::config_model::ConfigValue",
+    };
+    match value {
+        ConfigValue::List(items) => {
+            let first = items.first().map(scalar);
+            let element = match first {
+                Some(t) if items.iter().all(|item| scalar(item) == t) => t,
+                _ => "colap::model::config_model::ConfigValue",
+            };
+            (format!("Vec<{element}>"), Some(element.to_string()))
+        }
+        other => (scalar(other).to_string(), None),
     }
 }

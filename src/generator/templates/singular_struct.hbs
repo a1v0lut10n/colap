@@ -39,8 +39,15 @@ impl {{struct_name}} {
             let node_b = node.borrow();
             {
                 if let Some(val) = node_b.field_value("{{original_name}}") {
+                    {{#if is_list}}
+                    if let colap::model::config_model::ConfigValue::List(items) = val {
+                        result.{{name}} = {{> list_items}};
+                    }
+                    {{/if}}
                     {{#if (eq type "String")}}
-                    if let colap::model::config_model::ConfigValue::String(s) = val {
+                    if let colap::model::config_model::ConfigValue::String(s)
+                        | colap::model::config_model::ConfigValue::Symbol(s)
+                        | colap::model::config_model::ConfigValue::Reference(s) = val {
                         result.{{name}} = s.clone();
                     }
                     {{/if}}

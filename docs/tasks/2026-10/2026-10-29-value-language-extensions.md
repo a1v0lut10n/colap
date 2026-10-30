@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: planned
+status: in-progress
 affects:
   - README.md
 tags: [language-design, grammar, values]
@@ -66,3 +66,11 @@ Before setting `status: done`:
 - the ADR is accepted;
 - README.md's syntax section and comparison table match the grammar;
 - a journal entry links back to this task.
+
+## Progress note
+
+Decided in `docs/design/2026-10-30-value-language.md` (accepted
+2026-10-30). COLA-0007 implemented every value form: symbols, lists,
+references, decoded escapes and block strings, number separators and
+exponents, trailing commas. Comments are the one deliverable left, in
+their own ticket, because the model has to carry them through `fmt`.

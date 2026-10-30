@@ -1,0 +1,2 @@
+<path>:8:11: error: unresolved reference `@claims/cl-9`
+<path>:8:35: error: unresolved reference `@claims/cl-1/basis`

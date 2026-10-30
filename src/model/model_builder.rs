@@ -11,12 +11,15 @@
 //! The builder does not stop at the first problem. Every duplicate the
 //! model rejects is recorded (a rejected entity's subtree is skipped)
 //! and `finish` returns them all, so one file read reports every
-//! error in it.
+//! error in it. `finish` also resolves every `@path` reference against
+//! the finished model, so a reference may point forward, or into
+//! another block.
 
 use crate::error::Error;
 use crate::model::config_model::{ConfigModel, ConfigValue, ModelError, NodeId};
+use crate::model::literal;
 use crate::model::source_location::SourceLocation;
-use crate::parser::cola_actions::{Cola, Entity, Field, FieldList, FieldValue, NestedBlock};
+use crate::parser::cola_actions::{Cola, Entity, Field, FieldValue, Item, List, Scalar};
 use std::path::{Path, PathBuf};
 
 /// Builds a ConfigModel from parsed cola blocks.
@@ -69,10 +72,45 @@ impl ModelBuilder {
         &self.errors
     }
 
-    /// The finished model, or every error recorded while building it.
-    pub fn finish(self) -> Result<ConfigModel, Error> {
+    /// The finished model, or every error recorded while building it,
+    /// including every reference that resolves to no entity.
+    pub fn finish(mut self) -> Result<ConfigModel, Error> {
+        self.resolve_references();
         Error::collect(self.errors)?;
         Ok(self.model)
+    }
+
+    /// The model of the blocks added so far, with references left
+    /// unresolved: for one block of a document whose other blocks the
+    /// references may point into, when the whole document has already
+    /// been checked.
+    pub fn finish_block(self) -> Result<ConfigModel, Error> {
+        Error::collect(self.errors)?;
+        Ok(self.model)
+    }
+
+    fn resolve_references(&mut self) {
+        let mut unresolved = Vec::new();
+        for id in self.model.node_ids() {
+            let Some(node) = self.model.get_node(id) else {
+                continue;
+            };
+            for field in &node.borrow().fields {
+                for value in field.value.scalars() {
+                    if let ConfigValue::Reference(path) = value
+                        && self.model.find_entity_by_path(path).is_none()
+                    {
+                        unresolved.push(ModelError::UnresolvedReference {
+                            path: path.clone(),
+                            location: field.location.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        for error in unresolved {
+            self.reject(error);
+        }
     }
 
     /// Convert a single parsed block to a ConfigModel, with locations
@@ -135,27 +173,12 @@ impl ModelBuilder {
             }
         };
 
-        if let Some(nested_blocks) = definition {
-            for nested_block in nested_blocks {
-                match nested_block {
-                    NestedBlock::FieldList(field_list) => {
-                        self.process_field_list(entity_id, field_list);
-                    }
-                    NestedBlock::Entity(entity) => {
-                        self.process_entity(entity_id, entity);
-                    }
+        for item in definition.iter().flatten() {
+            match item {
+                Item::Field1(field) | Item::Field2(field) => {
+                    self.add_field_to_entity(entity_id, field);
                 }
-            }
-        }
-    }
-
-    /// Process a field list and add fields to the entity.
-    fn process_field_list(&mut self, entity_id: NodeId, field_list: &FieldList) {
-        match field_list {
-            FieldList::Field(field) => self.add_field_to_entity(entity_id, field),
-            FieldList::C2(c2) => {
-                self.process_field_list(entity_id, &c2.field_list);
-                self.add_field_to_entity(entity_id, &c2.field);
+                Item::Entity(entity) => self.process_entity(entity_id, entity),
             }
         }
     }
@@ -182,28 +205,38 @@ impl ModelBuilder {
     /// Convert a FieldValue from the AST to a ConfigValue for the model.
     fn convert_field_value(field_value: &FieldValue) -> Result<ConfigValue, String> {
         match field_value {
-            FieldValue::QuotedStringDouble(s) | FieldValue::QuotedStringSingle(s) => {
-                // Strip the surrounding quotes; escapes stay raw for now
-                // (see the value-language task).
-                let s_val = s.as_ref().trim();
-                Ok(ConfigValue::String(s_val[1..s_val.len() - 1].to_string()))
+            FieldValue::Scalar(scalar) => Self::convert_scalar(scalar),
+            FieldValue::List(List::Scalar0(items)) => items
+                .iter()
+                .flatten()
+                .map(Self::convert_scalar)
+                .collect::<Result<Vec<_>, _>>()
+                .map(ConfigValue::List),
+            FieldValue::List(List::Scalar1(items)) => items
+                .iter()
+                .map(Self::convert_scalar)
+                .collect::<Result<Vec<_>, _>>()
+                .map(ConfigValue::List),
+        }
+    }
+
+    fn convert_scalar(scalar: &Scalar) -> Result<ConfigValue, String> {
+        match scalar {
+            Scalar::QuotedStringDouble(s) | Scalar::QuotedStringSingle(s) => {
+                let raw = s.as_ref().trim();
+                literal::decode_quoted(&raw[1..raw.len() - 1]).map(ConfigValue::String)
             }
-            FieldValue::Number(n) => {
-                let n_str = n.as_ref().trim();
-                if n_str.contains('.') {
-                    n_str
-                        .parse::<f64>()
-                        .map(ConfigValue::Float)
-                        .map_err(|_| format!("invalid float: {n_str}"))
-                } else {
-                    n_str
-                        .parse::<i64>()
-                        .map(ConfigValue::Integer)
-                        .map_err(|_| format!("integer out of range: {n_str}"))
-                }
+            Scalar::BlockString(s) => {
+                let raw = s.as_ref().trim();
+                Ok(ConfigValue::String(literal::decode_block(
+                    &raw[3..raw.len() - 3],
+                )))
             }
-            FieldValue::BooleanTrue => Ok(ConfigValue::Boolean(true)),
-            FieldValue::BooleanFalse => Ok(ConfigValue::Boolean(false)),
+            Scalar::Number(n) => literal::parse_number(n.as_ref().trim()),
+            Scalar::BooleanTrue => Ok(ConfigValue::Boolean(true)),
+            Scalar::BooleanFalse => Ok(ConfigValue::Boolean(false)),
+            Scalar::Reference(r) => Ok(ConfigValue::Reference(r.as_ref().trim()[1..].to_string())),
+            Scalar::Identifier(i) => Ok(ConfigValue::Symbol(i.as_ref().trim().to_string())),
         }
     }
 }

@@ -1,1 +1,1 @@
-<path>:13:8: error: Expected one of BooleanFalse, BooleanTrue, Semicolon, Identifier, Number, QuotedStringDouble, QuotedStringSingle.
+<path>:13:8: error: Expected one of BooleanFalse, BooleanTrue, LBracket, Semicolon, Identifier, Number, Reference, QuotedStringDouble, QuotedStringSingle, BlockString.

@@ -2,7 +2,7 @@
 date: 2026-10-30
 type: task
 ticket: COLA-0007
-status: in-progress
+status: done
 affects:
   - src/grammar/cola.rustemo
   - src/model/config_model.rs
@@ -48,9 +48,35 @@ model to carry them through the formatter, follow in their own ticket.
 7. **Migration note** in the journal entry: escape decoding is the one
    change of meaning.
 
+## What was built
+
+As planned, with three things learned on the way:
+
+- The grammar's definition rule is `Item*` with `Item: Field | Field
+  Comma | Entity`: the comma belongs to the field before it, the
+  repetition is a vector rather than a left-recursive chain (a block of
+  thousands of entries builds no deep AST), and there is no conflict. A
+  comma never follows an entity. Two fields with no comma between them
+  were already accepted by the 0.2 grammar; the spec now says so and the
+  canonical layout always writes the comma.
+- `colap fmt` formats one block at a time, so a reference into another
+  block cannot resolve there; `ModelBuilder::finish_block` finishes a
+  model without resolving references, for a document that was already
+  checked whole.
+- The generator's templates were HTML-escaped by handlebars, which only
+  showed once a type contained `<`; escaping is now off, and the entity
+  template resolves its import path from the template root inside
+  `each` blocks, where it used to render empty.
+
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] Every corpus file's diagnostics equal its sidecar; the spec is
-      clean; token parity holds for the new tokens.
-- [ ] `cargo bench --bench scale` still passes.
+- [x] The three Rust gates are clean (clippy covers the bench).
+- [x] Every corpus file's diagnostics equal its sidecar (3 new valid
+      files, 3 new invalid ones); the spec is clean; token parity holds
+      for symbols, references and block strings.
+- [x] `tests/values.rs` pins every decoded value form, the unresolved
+      reference error and the trailing-comma equivalences.
+- [x] A crate generated from a sample with lists, symbols and references
+      compiles against this checkout (its legacy integration test still
+      names `Llms`, as before).
+- [x] `cargo bench --bench scale` still passes (1.02x).

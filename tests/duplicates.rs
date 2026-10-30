@@ -255,7 +255,7 @@ fn every_error_is_reported_in_line_order() {
     assert!(matches!(errors[1], Error::Parse { .. }), "{}", errors[1]);
     let expected = format!(
         "{p}:6:5: duplicate field `x` in `a`; first at 5:5\n\
-         {p}:12:8: Expected one of BooleanFalse, BooleanTrue, Semicolon, Identifier, Number, QuotedStringDouble, QuotedStringSingle.\n\
+         {p}:12:8: Expected one of BooleanFalse, BooleanTrue, LBracket, Semicolon, Identifier, Number, Reference, QuotedStringDouble, QuotedStringSingle, BlockString.\n\
          {p}:21:5: duplicate entry `cl-1` in `claim`; first at 18:5",
         p = path.display()
     );
