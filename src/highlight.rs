@@ -29,6 +29,9 @@ pub enum LineState {
     Cola(Fence),
     /// Inside a regular fenced code block opened with this fence.
     Code(Fence),
+    /// Inside a cola fence, within a `"""` block string that an
+    /// earlier line opened.
+    ColaString(Fence),
 }
 
 impl LineState {
@@ -38,7 +41,7 @@ impl LineState {
     pub const BARE_COLA: LineState = LineState::Cola(Fence { ch: b'`', len: 3 });
 
     pub fn is_cola(self) -> bool {
-        matches!(self, LineState::Cola(_))
+        matches!(self, LineState::Cola(_) | LineState::ColaString(_))
     }
 }
 
@@ -57,11 +60,15 @@ pub enum TokenKind {
     Boolean,
     /// An identifier (entity or field name).
     Identifier,
+    /// An identifier in value position.
+    Symbol,
+    /// `@path`.
+    Reference,
     /// A number literal.
     Number,
-    /// A quoted string (single or double).
+    /// A quoted string (single, double or a `"""` block).
     String,
-    /// `:` `,` `;`.
+    /// `:` `,` `;` `[` `]`.
     Punctuation,
 }
 
@@ -98,11 +105,17 @@ pub fn line_tokens(line: &str, state: LineState) -> (Vec<Token>, LineState) {
                 (vec![whole(line, TokenKind::CodeLine)], state)
             }
         }
-        LineState::Cola(fence) => {
+        LineState::Cola(fence) | LineState::ColaString(fence) => {
             if closes(line, fence) {
                 (vec![whole(line, TokenKind::Fence)], LineState::Prose)
             } else {
-                (cola_tokens(line), state)
+                let (tokens, open) = cola_tokens(line, matches!(state, LineState::ColaString(_)));
+                let next = if open {
+                    LineState::ColaString(fence)
+                } else {
+                    LineState::Cola(fence)
+                };
+                (tokens, next)
             }
         }
     }
@@ -130,13 +143,47 @@ fn whole(line: &str, kind: TokenKind) -> Token {
     }
 }
 
-/// Inside a cola fence: entities, fields, values.
-fn cola_tokens(line: &str) -> Vec<Token> {
+/// Inside a cola fence: entities, fields, values. `in_string` says the
+/// line starts inside a `"""` block string; the returned flag says
+/// whether the next one does.
+fn cola_tokens(line: &str, in_string: bool) -> (Vec<Token>, bool) {
     let b = line.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
+    if in_string {
+        match line.find("\"\"\"") {
+            Some(end) => {
+                out.push(Token {
+                    range: 0..end + 3,
+                    kind: TokenKind::String,
+                });
+                i = end + 3;
+            }
+            None => return (vec![whole(line, TokenKind::String)], true),
+        }
+    }
     while i < b.len() {
         let c = b[i];
+        if line[i..].starts_with("\"\"\"") {
+            let start = i;
+            match line[i + 3..].find("\"\"\"") {
+                Some(end) => {
+                    i += 3 + end + 3;
+                    out.push(Token {
+                        range: start..i,
+                        kind: TokenKind::String,
+                    });
+                    continue;
+                }
+                None => {
+                    out.push(Token {
+                        range: start..line.trim_end_matches(['\n', '\r']).len(),
+                        kind: TokenKind::String,
+                    });
+                    return (out, true);
+                }
+            }
+        }
         if c == b'"' || c == b'\'' {
             // Quoted string with escapes; unterminated runs to EOL
             // (mid-edit tolerance).
@@ -153,6 +200,23 @@ fn cola_tokens(line: &str) -> Vec<Token> {
             });
             continue;
         }
+        if c == b'@'
+            && b.get(i + 1)
+                .is_some_and(|&n| n.is_ascii_alphabetic() || n == b'_')
+        {
+            let start = i;
+            i += 1;
+            while i < b.len()
+                && (b[i].is_ascii_alphanumeric() || matches!(b[i], b'_' | b'.' | b'-' | b'/'))
+            {
+                i += 1;
+            }
+            out.push(Token {
+                range: start..i,
+                kind: TokenKind::Reference,
+            });
+            continue;
+        }
         if c.is_ascii_alphabetic() || c == b'_' {
             let start = i;
             while i < b.len()
@@ -164,7 +228,8 @@ fn cola_tokens(line: &str) -> Vec<Token> {
             let kind = match word {
                 "plural" => TokenKind::Keyword,
                 "true" | "false" => TokenKind::Boolean,
-                _ => TokenKind::Identifier,
+                _ if names_something(&line[i..]) => TokenKind::Identifier,
+                _ => TokenKind::Symbol,
             };
             out.push(Token {
                 range: start..i,
@@ -177,13 +242,26 @@ fn cola_tokens(line: &str) -> Vec<Token> {
         {
             let start = i;
             i += 1;
-            while i < b.len() && b[i].is_ascii_digit() {
-                i += 1;
-            }
+            let digits = |i: &mut usize| {
+                while *i < b.len() && (b[*i].is_ascii_digit() || b[*i] == b'_') {
+                    *i += 1;
+                }
+            };
+            digits(&mut i);
             if i + 1 < b.len() && b[i] == b'.' && b[i + 1].is_ascii_digit() {
                 i += 1;
-                while i < b.len() && b[i].is_ascii_digit() {
-                    i += 1;
+                digits(&mut i);
+            }
+            if i < b.len() && matches!(b[i], b'e' | b'E') {
+                let mut j = i + 1;
+                if j < b.len() && matches!(b[j], b'+' | b'-') {
+                    j += 1;
+                }
+                if j < b.len() && b[j].is_ascii_digit() {
+                    while j < b.len() && b[j].is_ascii_digit() {
+                        j += 1;
+                    }
+                    i = j;
                 }
             }
             out.push(Token {
@@ -192,7 +270,7 @@ fn cola_tokens(line: &str) -> Vec<Token> {
             });
             continue;
         }
-        if matches!(c, b':' | b',' | b';') {
+        if matches!(c, b':' | b',' | b';' | b'[' | b']') {
             out.push(Token {
                 range: i..i + 1,
                 kind: TokenKind::Punctuation,
@@ -202,7 +280,19 @@ fn cola_tokens(line: &str) -> Vec<Token> {
         }
         i += line[i..].chars().next().map(char::len_utf8).unwrap_or(1);
     }
-    out
+    (out, false)
+}
+
+/// Whether the text after a word makes it a name: a `:` or the
+/// `plural` keyword follows. Anything else makes the word a symbol.
+/// A name whose `:` sits on the next line is shown as a symbol, which
+/// an editor tolerates and the parser does not care about.
+fn names_something(rest: &str) -> bool {
+    let rest = rest.trim_start_matches([' ', '\t']);
+    rest.starts_with(':')
+        || rest
+            .strip_prefix("plural")
+            .is_some_and(|after| after.is_empty() || after.starts_with([' ', '\t', '\n', '\r']))
 }
 
 #[cfg(test)]

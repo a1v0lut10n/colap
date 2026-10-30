@@ -80,9 +80,9 @@ llm plural llms:
 |------------------------------|---------------|--------------|--------------|---------------|
 | Whitespace sensitivity       | 😬 Yes         | 👍 No         | 👍 No         | ✅ No          |
 | Curly brace clutter          | 👍 Minimal     | 😩 Lots       | 👍 Minimal    | ✅ Minimal     |
-| Trailing commas allowed      | ❌ No          | ❌ No         | ✅ Yes        | ❌ Not yet     |
+| Trailing commas allowed      | ❌ No          | ❌ No         | ✅ Yes        | ✅ Yes         |
 | Multi-line strings           | 🤔 Hard        | 😕 Escapes    | ✅ Easy       | ✅ Easy        |
-| Collections (arrays/maps)    | 😕 Indents     | 😩 `[]`, `{}` | 😕 Mixed      | ✅ Infix `plural` |
+| Collections (arrays/maps)    | 😕 Indents     | 😩 `[]`, `{}` | 😕 Mixed      | ✅ `[]` lists, infix `plural` maps |
 | Markdown embedding           | ❌ Awkward     | ❌ Awkward    | ❌ Awkward    | ✅ First-class |
 
 ---
@@ -90,8 +90,7 @@ llm plural llms:
 The language is specified in [`docs/spec/cola.md`](docs/spec/cola.md), a
 literate document that colap itself checks; a conformance corpus under
 `tests/conformance/` holds the parser, the diagnostics and the highlighter to
-it. Trailing commas, comments and decoded escapes are open decisions listed
-there.
+it. Comments are the one open decision listed there.
 
 ---
 
@@ -137,6 +136,10 @@ model plural models:
 - Produces structured configuration models whose source locations point into
   the original file
 - Reports errors as `path:line:col: message`
+- Values: strings with escapes and `"""` block strings, numbers with digit
+  separators and exponents, booleans, bare symbols (`basis: parsed`), lists
+  (`tags: [a, "b", 3]`) and references (`@claims/cl-1`) that `colap check`
+  resolves
 - Reads large files in linear time: a 10k-entry ledger (5 MB) in about
   0.4 s; `cargo bench --bench scale` guards it
 
@@ -363,10 +366,11 @@ The generator maps Cola types to Rust types as follows:
 
 | Cola Type | Rust Type |
 |-----------|----------|
-| String | `String` |
+| String, Symbol, Reference | `String` |
 | Integer | `i64` |
 | Float | `f64` |
 | Boolean | `bool` |
+| List | `Vec<T>` of the elements' type, `Vec<ConfigValue>` when empty or mixed |
 | Entity | Custom struct |
 | Optional Entity | `Option<CustomStruct>` |
 

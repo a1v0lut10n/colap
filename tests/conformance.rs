@@ -8,7 +8,7 @@ use colap::highlight::{LineState, TokenKind, line_tokens};
 use colap::literate::scan;
 use colap::parser::cola::ColaParser;
 use colap::parser::cola_actions::{
-    Cola, Entity, EntityDefinition, Field, FieldList, FieldValue, NestedBlock,
+    Cola, Entity, EntityDefinition, Field, FieldValue, Item, List, Scalar,
 };
 use colap::rustemo::{Parser as _, ValLoc};
 use std::collections::BTreeSet;
@@ -137,20 +137,10 @@ impl Walk<'_> {
     }
 
     fn definition(&mut self, d: &EntityDefinition) {
-        for block in d.iter().flatten() {
-            match block {
-                NestedBlock::FieldList(fl) => self.fields(fl),
-                NestedBlock::Entity(e) => self.entity(e),
-            }
-        }
-    }
-
-    fn fields(&mut self, fl: &FieldList) {
-        match fl {
-            FieldList::Field(f) => self.field(f),
-            FieldList::C2(c) => {
-                self.fields(&c.field_list);
-                self.field(&c.field);
+        for item in d.iter().flatten() {
+            match item {
+                Item::Field1(f) | Item::Field2(f) => self.field(f),
+                Item::Entity(e) => self.entity(e),
             }
         }
     }
@@ -158,11 +148,23 @@ impl Walk<'_> {
     fn field(&mut self, f: &Field) {
         self.term(&f.identifier, "Identifier");
         match &f.field_value {
-            FieldValue::QuotedStringDouble(s) | FieldValue::QuotedStringSingle(s) => {
-                self.term(s, "String")
+            FieldValue::Scalar(s) => self.scalar(s),
+            FieldValue::List(List::Scalar0(items)) => {
+                items.iter().flatten().for_each(|s| self.scalar(s))
             }
-            FieldValue::Number(n) => self.term(n, "Number"),
-            FieldValue::BooleanTrue | FieldValue::BooleanFalse => {}
+            FieldValue::List(List::Scalar1(items)) => items.iter().for_each(|s| self.scalar(s)),
+        }
+    }
+
+    fn scalar(&mut self, s: &Scalar) {
+        match s {
+            Scalar::QuotedStringDouble(s)
+            | Scalar::QuotedStringSingle(s)
+            | Scalar::BlockString(s) => self.term(s, "String"),
+            Scalar::Number(n) => self.term(n, "Number"),
+            Scalar::Reference(r) => self.term(r, "Reference"),
+            Scalar::Identifier(i) => self.term(i, "Symbol"),
+            Scalar::BooleanTrue | Scalar::BooleanFalse => {}
         }
     }
 }
@@ -199,7 +201,8 @@ fn parser_terms(text: &str) -> (BTreeSet<Term>, BTreeSet<u32>) {
     (terms, skip)
 }
 
-/// The highlighter's identifier, number and string tokens on cola lines.
+/// The highlighter's identifier, symbol, reference, number and string
+/// tokens on cola lines.
 fn highlighter_terms(text: &str, skip: &BTreeSet<u32>) -> BTreeSet<Term> {
     let mut out = BTreeSet::new();
     let mut state = LineState::default();
@@ -212,6 +215,8 @@ fn highlighter_terms(text: &str, skip: &BTreeSet<u32>) -> BTreeSet<Term> {
                     TokenKind::Identifier => "Identifier",
                     TokenKind::Number => "Number",
                     TokenKind::String => "String",
+                    TokenKind::Symbol => "Symbol",
+                    TokenKind::Reference => "Reference",
                     _ => continue,
                 };
                 out.insert((file_line, t.range.start, t.range.end, kind));

@@ -12,11 +12,11 @@ impl {{struct_name}} {
     }
 {{/each}}
 
-    pub fn from_model(model: &{{model_import}}::ConfigModel) -> Self {
+    pub fn from_model(model: &{{@root.model_import}}::ConfigModel) -> Self {
         Self::from_entity(model, model.root_id())
     }
     
-    pub fn from_entity(model: &{{model_import}}::ConfigModel, id: usize) -> Self {
+    pub fn from_entity(model: &{{@root.model_import}}::ConfigModel, id: usize) -> Self {
         let mut result = Self::default();
         
         // Process primitive fields
@@ -27,20 +27,26 @@ impl {{struct_name}} {
                 {{#each fields}}
                 {{#unless is_entity}}
                 if let Some(val) = node_b.field_value("{{original_name}}") {
-                    {{#if (eq type "String")}}
-                    if let {{model_import}}::ConfigValue::String(s) = val {
+                    {{#if is_list}}
+                    if let {{@root.model_import}}::ConfigValue::List(items) = val {
+                        result.{{name}} = {{> list_items}};
+                    }
+                    {{else if (eq type "String")}}
+                    if let {{@root.model_import}}::ConfigValue::String(s)
+                        | {{@root.model_import}}::ConfigValue::Symbol(s)
+                        | {{@root.model_import}}::ConfigValue::Reference(s) = val {
                         result.{{name}} = s.clone();
                     }
                     {{else if (eq type "i64")}}
-                    if let {{model_import}}::ConfigValue::Integer(i) = val {
+                    if let {{@root.model_import}}::ConfigValue::Integer(i) = val {
                         result.{{name}} = *i;
                     }
                     {{else if (eq type "f64")}}
-                    if let {{model_import}}::ConfigValue::Float(f) = val {
+                    if let {{@root.model_import}}::ConfigValue::Float(f) = val {
                         result.{{name}} = *f;
                     }
                     {{else if (eq type "bool")}}
-                    if let {{model_import}}::ConfigValue::Boolean(b) = val {
+                    if let {{@root.model_import}}::ConfigValue::Boolean(b) = val {
                         result.{{name}} = *b;
                     }
                     {{/if}}

@@ -18,10 +18,10 @@ use rustemo::{LRContext, LRParser};
 use std::fmt::Debug;
 use std::hash::Hash;
 pub type Input = str;
-const STATE_COUNT: usize = 41usize;
-const MAX_RECOGNIZERS: usize = 7usize;
+const STATE_COUNT: usize = 51usize;
+const MAX_RECOGNIZERS: usize = 10usize;
 #[allow(dead_code)]
-const TERMINAL_COUNT: usize = 13usize;
+const TERMINAL_COUNT: usize = 16usize;
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenKind {
@@ -31,13 +31,16 @@ pub enum TokenKind {
     BooleanFalse,
     Colon,
     Comma,
+    LBracket,
+    RBracket,
     Identifier,
     Number,
     PluralKeyword,
+    Reference,
     QuotedStringDouble,
     QuotedStringSingle,
+    BlockString,
     Semicolon,
-    UnquotedString,
     WS,
 }
 use TokenKind as TK;
@@ -59,20 +62,30 @@ pub enum ProdKind {
     PluralEntityP1,
     SingularEntityP1,
     EntityDefinitionP1,
-    NestedBlock1P1,
-    NestedBlock1P2,
-    NestedBlock0P1,
-    NestedBlock0P2,
-    NestedBlockP1,
-    NestedBlockP2,
-    FieldListP1,
-    FieldListP2,
+    Item1P1,
+    Item1P2,
+    Item0P1,
+    Item0P2,
+    ItemP1,
+    ItemP2,
+    ItemP3,
     FieldP1,
     FieldValueP1,
     FieldValueP2,
-    FieldValueP3,
-    FieldValueP4,
-    FieldValueP5,
+    ScalarP1,
+    ScalarP2,
+    ScalarP3,
+    ScalarP4,
+    ScalarP5,
+    ScalarP6,
+    ScalarP7,
+    ScalarP8,
+    ListP1,
+    Scalar1P1,
+    Scalar1P2,
+    Scalar0P1,
+    Scalar0P2,
+    ListP2,
     LayoutP1,
     WS1P1,
     WS1P2,
@@ -95,21 +108,31 @@ impl std::fmt::Debug for ProdKind {
             ProdKind::SingularEntityP1 => {
                 "SingularEntity: Identifier Colon EntityDefinition Semicolon"
             }
-            ProdKind::EntityDefinitionP1 => "EntityDefinition: NestedBlock0",
-            ProdKind::NestedBlock1P1 => "NestedBlock1: NestedBlock1 NestedBlock",
-            ProdKind::NestedBlock1P2 => "NestedBlock1: NestedBlock",
-            ProdKind::NestedBlock0P1 => "NestedBlock0: NestedBlock1",
-            ProdKind::NestedBlock0P2 => "NestedBlock0: ",
-            ProdKind::NestedBlockP1 => "NestedBlock: FieldList",
-            ProdKind::NestedBlockP2 => "NestedBlock: Entity",
-            ProdKind::FieldListP1 => "FieldList: Field",
-            ProdKind::FieldListP2 => "FieldList: FieldList Comma Field",
+            ProdKind::EntityDefinitionP1 => "EntityDefinition: Item0",
+            ProdKind::Item1P1 => "Item1: Item1 Item",
+            ProdKind::Item1P2 => "Item1: Item",
+            ProdKind::Item0P1 => "Item0: Item1",
+            ProdKind::Item0P2 => "Item0: ",
+            ProdKind::ItemP1 => "Item: Field",
+            ProdKind::ItemP2 => "Item: Field Comma",
+            ProdKind::ItemP3 => "Item: Entity",
             ProdKind::FieldP1 => "Field: Identifier Colon FieldValue",
-            ProdKind::FieldValueP1 => "FieldValue: QuotedStringDouble",
-            ProdKind::FieldValueP2 => "FieldValue: QuotedStringSingle",
-            ProdKind::FieldValueP3 => "FieldValue: Number",
-            ProdKind::FieldValueP4 => "FieldValue: BooleanTrue",
-            ProdKind::FieldValueP5 => "FieldValue: BooleanFalse",
+            ProdKind::FieldValueP1 => "FieldValue: Scalar",
+            ProdKind::FieldValueP2 => "FieldValue: List",
+            ProdKind::ScalarP1 => "Scalar: QuotedStringDouble",
+            ProdKind::ScalarP2 => "Scalar: QuotedStringSingle",
+            ProdKind::ScalarP3 => "Scalar: BlockString",
+            ProdKind::ScalarP4 => "Scalar: Number",
+            ProdKind::ScalarP5 => "Scalar: BooleanTrue",
+            ProdKind::ScalarP6 => "Scalar: BooleanFalse",
+            ProdKind::ScalarP7 => "Scalar: Reference",
+            ProdKind::ScalarP8 => "Scalar: Identifier",
+            ProdKind::ListP1 => "List: LBracket Scalar0 RBracket",
+            ProdKind::Scalar1P1 => "Scalar1: Scalar1 Comma Scalar",
+            ProdKind::Scalar1P2 => "Scalar1: Scalar",
+            ProdKind::Scalar0P1 => "Scalar0: Scalar1",
+            ProdKind::Scalar0P2 => "Scalar0: ",
+            ProdKind::ListP2 => "List: LBracket Scalar1 Comma RBracket",
             ProdKind::LayoutP1 => "Layout: WS1",
             ProdKind::WS1P1 => "WS1: WS1 WS",
             ProdKind::WS1P2 => "WS1: WS",
@@ -132,12 +155,15 @@ pub enum NonTermKind {
     PluralEntity,
     SingularEntity,
     EntityDefinition,
-    NestedBlock1,
-    NestedBlock0,
-    NestedBlock,
-    FieldList,
+    Item1,
+    Item0,
+    Item,
     Field,
     FieldValue,
+    Scalar,
+    List,
+    Scalar1,
+    Scalar0,
     Layout,
     WS1,
 }
@@ -154,20 +180,30 @@ impl From<ProdKind> for NonTermKind {
             ProdKind::PluralEntityP1 => NonTermKind::PluralEntity,
             ProdKind::SingularEntityP1 => NonTermKind::SingularEntity,
             ProdKind::EntityDefinitionP1 => NonTermKind::EntityDefinition,
-            ProdKind::NestedBlock1P1 => NonTermKind::NestedBlock1,
-            ProdKind::NestedBlock1P2 => NonTermKind::NestedBlock1,
-            ProdKind::NestedBlock0P1 => NonTermKind::NestedBlock0,
-            ProdKind::NestedBlock0P2 => NonTermKind::NestedBlock0,
-            ProdKind::NestedBlockP1 => NonTermKind::NestedBlock,
-            ProdKind::NestedBlockP2 => NonTermKind::NestedBlock,
-            ProdKind::FieldListP1 => NonTermKind::FieldList,
-            ProdKind::FieldListP2 => NonTermKind::FieldList,
+            ProdKind::Item1P1 => NonTermKind::Item1,
+            ProdKind::Item1P2 => NonTermKind::Item1,
+            ProdKind::Item0P1 => NonTermKind::Item0,
+            ProdKind::Item0P2 => NonTermKind::Item0,
+            ProdKind::ItemP1 => NonTermKind::Item,
+            ProdKind::ItemP2 => NonTermKind::Item,
+            ProdKind::ItemP3 => NonTermKind::Item,
             ProdKind::FieldP1 => NonTermKind::Field,
             ProdKind::FieldValueP1 => NonTermKind::FieldValue,
             ProdKind::FieldValueP2 => NonTermKind::FieldValue,
-            ProdKind::FieldValueP3 => NonTermKind::FieldValue,
-            ProdKind::FieldValueP4 => NonTermKind::FieldValue,
-            ProdKind::FieldValueP5 => NonTermKind::FieldValue,
+            ProdKind::ScalarP1 => NonTermKind::Scalar,
+            ProdKind::ScalarP2 => NonTermKind::Scalar,
+            ProdKind::ScalarP3 => NonTermKind::Scalar,
+            ProdKind::ScalarP4 => NonTermKind::Scalar,
+            ProdKind::ScalarP5 => NonTermKind::Scalar,
+            ProdKind::ScalarP6 => NonTermKind::Scalar,
+            ProdKind::ScalarP7 => NonTermKind::Scalar,
+            ProdKind::ScalarP8 => NonTermKind::Scalar,
+            ProdKind::ListP1 => NonTermKind::List,
+            ProdKind::Scalar1P1 => NonTermKind::Scalar1,
+            ProdKind::Scalar1P2 => NonTermKind::Scalar1,
+            ProdKind::Scalar0P1 => NonTermKind::Scalar0,
+            ProdKind::Scalar0P2 => NonTermKind::Scalar0,
+            ProdKind::ListP2 => NonTermKind::List,
             ProdKind::LayoutP1 => NonTermKind::Layout,
             ProdKind::WS1P1 => NonTermKind::WS1,
             ProdKind::WS1P2 => NonTermKind::WS1,
@@ -193,37 +229,47 @@ pub enum State {
     IdentifierS11,
     EntityS12,
     EntityDefinitionS13,
-    NestedBlock1S14,
-    NestedBlock0S15,
-    NestedBlockS16,
-    FieldListS17,
-    FieldS18,
-    IdentifierS19,
-    ColonS20,
-    SemicolonS21,
-    NestedBlockS22,
-    CommaS23,
-    ColonS24,
-    BooleanTrueS25,
-    BooleanFalseS26,
-    NumberS27,
-    QuotedStringDoubleS28,
-    QuotedStringSingleS29,
-    FieldValueS30,
-    IdentifierS31,
-    FieldS32,
-    EntityDefinitionS33,
-    ColonS34,
-    SemicolonS35,
-    AUGLS36,
-    WSS37,
-    LayoutS38,
-    WS1S39,
-    WSS40,
+    Item1S14,
+    Item0S15,
+    ItemS16,
+    FieldS17,
+    IdentifierS18,
+    ColonS19,
+    SemicolonS20,
+    ItemS21,
+    CommaS22,
+    ColonS23,
+    BooleanTrueS24,
+    BooleanFalseS25,
+    LBracketS26,
+    IdentifierS27,
+    NumberS28,
+    ReferenceS29,
+    QuotedStringDoubleS30,
+    QuotedStringSingleS31,
+    BlockStringS32,
+    FieldValueS33,
+    ScalarS34,
+    ListS35,
+    EntityDefinitionS36,
+    IdentifierS37,
+    ScalarS38,
+    Scalar1S39,
+    Scalar0S40,
+    SemicolonS41,
+    CommaS42,
+    RBracketS43,
+    RBracketS44,
+    ScalarS45,
+    AUGLS46,
+    WSS47,
+    LayoutS48,
+    WS1S49,
+    WSS50,
 }
 impl StateT for State {
     fn default_layout() -> Option<Self> {
-        Some(State::AUGLS36)
+        Some(State::AUGLS46)
     }
 }
 impl From<State> for usize {
@@ -248,33 +294,43 @@ impl std::fmt::Debug for State {
             State::IdentifierS11 => "11:Identifier",
             State::EntityS12 => "12:Entity",
             State::EntityDefinitionS13 => "13:EntityDefinition",
-            State::NestedBlock1S14 => "14:NestedBlock1",
-            State::NestedBlock0S15 => "15:NestedBlock0",
-            State::NestedBlockS16 => "16:NestedBlock",
-            State::FieldListS17 => "17:FieldList",
-            State::FieldS18 => "18:Field",
-            State::IdentifierS19 => "19:Identifier",
-            State::ColonS20 => "20:Colon",
-            State::SemicolonS21 => "21:Semicolon",
-            State::NestedBlockS22 => "22:NestedBlock",
-            State::CommaS23 => "23:Comma",
-            State::ColonS24 => "24:Colon",
-            State::BooleanTrueS25 => "25:BooleanTrue",
-            State::BooleanFalseS26 => "26:BooleanFalse",
-            State::NumberS27 => "27:Number",
-            State::QuotedStringDoubleS28 => "28:QuotedStringDouble",
-            State::QuotedStringSingleS29 => "29:QuotedStringSingle",
-            State::FieldValueS30 => "30:FieldValue",
-            State::IdentifierS31 => "31:Identifier",
-            State::FieldS32 => "32:Field",
-            State::EntityDefinitionS33 => "33:EntityDefinition",
-            State::ColonS34 => "34:Colon",
-            State::SemicolonS35 => "35:Semicolon",
-            State::AUGLS36 => "36:AUGL",
-            State::WSS37 => "37:WS",
-            State::LayoutS38 => "38:Layout",
-            State::WS1S39 => "39:WS1",
-            State::WSS40 => "40:WS",
+            State::Item1S14 => "14:Item1",
+            State::Item0S15 => "15:Item0",
+            State::ItemS16 => "16:Item",
+            State::FieldS17 => "17:Field",
+            State::IdentifierS18 => "18:Identifier",
+            State::ColonS19 => "19:Colon",
+            State::SemicolonS20 => "20:Semicolon",
+            State::ItemS21 => "21:Item",
+            State::CommaS22 => "22:Comma",
+            State::ColonS23 => "23:Colon",
+            State::BooleanTrueS24 => "24:BooleanTrue",
+            State::BooleanFalseS25 => "25:BooleanFalse",
+            State::LBracketS26 => "26:LBracket",
+            State::IdentifierS27 => "27:Identifier",
+            State::NumberS28 => "28:Number",
+            State::ReferenceS29 => "29:Reference",
+            State::QuotedStringDoubleS30 => "30:QuotedStringDouble",
+            State::QuotedStringSingleS31 => "31:QuotedStringSingle",
+            State::BlockStringS32 => "32:BlockString",
+            State::FieldValueS33 => "33:FieldValue",
+            State::ScalarS34 => "34:Scalar",
+            State::ListS35 => "35:List",
+            State::EntityDefinitionS36 => "36:EntityDefinition",
+            State::IdentifierS37 => "37:Identifier",
+            State::ScalarS38 => "38:Scalar",
+            State::Scalar1S39 => "39:Scalar1",
+            State::Scalar0S40 => "40:Scalar0",
+            State::SemicolonS41 => "41:Semicolon",
+            State::CommaS42 => "42:Comma",
+            State::RBracketS43 => "43:RBracket",
+            State::RBracketS44 => "44:RBracket",
+            State::ScalarS45 => "45:Scalar",
+            State::AUGLS46 => "46:AUGL",
+            State::WSS47 => "47:WS",
+            State::LayoutS48 => "48:Layout",
+            State::WS1S49 => "49:WS1",
+            State::WSS50 => "50:WS",
         };
         write!(f, "{name}")
     }
@@ -291,11 +347,15 @@ pub enum Terminal {
     BooleanFalse,
     Colon,
     Comma,
+    LBracket,
+    RBracket,
     Identifier(cola_actions::Identifier),
     Number(cola_actions::Number),
     PluralKeyword,
+    Reference(cola_actions::Reference),
     QuotedStringDouble(cola_actions::QuotedStringDouble),
     QuotedStringSingle(cola_actions::QuotedStringSingle),
+    BlockString(cola_actions::BlockString),
     Semicolon,
 }
 #[derive(Debug)]
@@ -307,12 +367,15 @@ pub enum NonTerminal {
     PluralEntity(cola_actions::PluralEntity),
     SingularEntity(cola_actions::SingularEntity),
     EntityDefinition(cola_actions::EntityDefinition),
-    NestedBlock1(cola_actions::NestedBlock1),
-    NestedBlock0(cola_actions::NestedBlock0),
-    NestedBlock(cola_actions::NestedBlock),
-    FieldList(cola_actions::FieldList),
+    Item1(cola_actions::Item1),
+    Item0(cola_actions::Item0),
+    Item(cola_actions::Item),
     Field(cola_actions::Field),
     FieldValue(cola_actions::FieldValue),
+    Scalar(cola_actions::Scalar),
+    List(cola_actions::List),
+    Scalar1(cola_actions::Scalar1),
+    Scalar0(cola_actions::Scalar0),
 }
 type ActionFn = fn(token: TokenKind) -> Vec<Action<State, ProdKind>>;
 pub struct ColaParserDefinition {
@@ -379,13 +442,13 @@ fn action_singularentity_s7(token_kind: TokenKind) -> Vec<Action<State, ProdKind
 fn action_colon_s8(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::Identifier => Vec::from(&[Shift(State::IdentifierS11)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock0P2, 0usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item0P2, 0usize)]),
         _ => vec![],
     }
 }
 fn action_pluralkeyword_s9(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Identifier => Vec::from(&[Shift(State::IdentifierS19)]),
+        TK::Identifier => Vec::from(&[Shift(State::IdentifierS18)]),
         _ => vec![],
     }
 }
@@ -398,79 +461,74 @@ fn action_entity_s10(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
 }
 fn action_identifier_s11(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Colon => Vec::from(&[Shift(State::ColonS20)]),
+        TK::Colon => Vec::from(&[Shift(State::ColonS19)]),
         TK::PluralKeyword => Vec::from(&[Shift(State::PluralKeywordS9)]),
         _ => vec![],
     }
 }
 fn action_entity_s12(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Identifier => Vec::from(&[Reduce(PK::NestedBlockP2, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlockP2, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ItemP3, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ItemP3, 1usize)]),
         _ => vec![],
     }
 }
 fn action_entitydefinition_s13(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Semicolon => Vec::from(&[Shift(State::SemicolonS21)]),
+        TK::Semicolon => Vec::from(&[Shift(State::SemicolonS20)]),
         _ => vec![],
     }
 }
-fn action_nestedblock1_s14(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_item1_s14(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::Identifier => Vec::from(&[Shift(State::IdentifierS11)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock0P1, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item0P1, 1usize)]),
         _ => vec![],
     }
 }
-fn action_nestedblock0_s15(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_item0_s15(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::Semicolon => Vec::from(&[Reduce(PK::EntityDefinitionP1, 1usize)]),
         _ => vec![],
     }
 }
-fn action_nestedblock_s16(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_item_s16(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Identifier => Vec::from(&[Reduce(PK::NestedBlock1P2, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock1P2, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::Item1P2, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item1P2, 1usize)]),
         _ => vec![],
     }
 }
-fn action_fieldlist_s17(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_field_s17(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Shift(State::CommaS23)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::NestedBlockP1, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlockP1, 1usize)]),
+        TK::Comma => Vec::from(&[Shift(State::CommaS22)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ItemP1, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ItemP1, 1usize)]),
         _ => vec![],
     }
 }
-fn action_field_s18(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_identifier_s18(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldListP1, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldListP1, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldListP1, 1usize)]),
+        TK::Colon => Vec::from(&[Shift(State::ColonS23)]),
         _ => vec![],
     }
 }
-fn action_identifier_s19(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_colon_s19(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Colon => Vec::from(&[Shift(State::ColonS24)]),
+        TK::BooleanTrue => Vec::from(&[Shift(State::BooleanTrueS24)]),
+        TK::BooleanFalse => Vec::from(&[Shift(State::BooleanFalseS25)]),
+        TK::LBracket => Vec::from(&[Shift(State::LBracketS26)]),
+        TK::Identifier => Vec::from(&[Shift(State::IdentifierS27)]),
+        TK::Number => Vec::from(&[Shift(State::NumberS28)]),
+        TK::Reference => Vec::from(&[Shift(State::ReferenceS29)]),
+        TK::QuotedStringDouble => Vec::from(&[Shift(State::QuotedStringDoubleS30)]),
+        TK::QuotedStringSingle => Vec::from(&[Shift(State::QuotedStringSingleS31)]),
+        TK::BlockString => Vec::from(&[Shift(State::BlockStringS32)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item0P2, 0usize)]),
         _ => vec![],
     }
 }
-fn action_colon_s20(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
-    match token_kind {
-        TK::BooleanTrue => Vec::from(&[Shift(State::BooleanTrueS25)]),
-        TK::BooleanFalse => Vec::from(&[Shift(State::BooleanFalseS26)]),
-        TK::Identifier => Vec::from(&[Shift(State::IdentifierS11)]),
-        TK::Number => Vec::from(&[Shift(State::NumberS27)]),
-        TK::QuotedStringDouble => Vec::from(&[Shift(State::QuotedStringDoubleS28)]),
-        TK::QuotedStringSingle => Vec::from(&[Shift(State::QuotedStringSingleS29)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock0P2, 0usize)]),
-        _ => vec![],
-    }
-}
-fn action_semicolon_s21(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_semicolon_s20(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Reduce(PK::SingularEntityP1, 4usize)]),
         TK::Identifier => Vec::from(&[Reduce(PK::SingularEntityP1, 4usize)]),
@@ -478,67 +536,115 @@ fn action_semicolon_s21(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
         _ => vec![],
     }
 }
-fn action_nestedblock_s22(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_item_s21(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Identifier => Vec::from(&[Reduce(PK::NestedBlock1P1, 2usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock1P1, 2usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::Item1P1, 2usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item1P1, 2usize)]),
         _ => vec![],
     }
 }
-fn action_comma_s23(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_comma_s22(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Identifier => Vec::from(&[Shift(State::IdentifierS31)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ItemP2, 2usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ItemP2, 2usize)]),
         _ => vec![],
     }
 }
-fn action_colon_s24(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_colon_s23(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::Identifier => Vec::from(&[Shift(State::IdentifierS11)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::NestedBlock0P2, 0usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::Item0P2, 0usize)]),
         _ => vec![],
     }
 }
-fn action_booleantrue_s25(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_booleantrue_s24(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP4, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP4, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP4, 1usize)]),
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP5, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP5, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP5, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP5, 1usize)]),
         _ => vec![],
     }
 }
-fn action_booleanfalse_s26(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_booleanfalse_s25(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP5, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP5, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP5, 1usize)]),
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP6, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP6, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP6, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP6, 1usize)]),
         _ => vec![],
     }
 }
-fn action_number_s27(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_lbracket_s26(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP3, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP3, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP3, 1usize)]),
+        TK::BooleanTrue => Vec::from(&[Shift(State::BooleanTrueS24)]),
+        TK::BooleanFalse => Vec::from(&[Shift(State::BooleanFalseS25)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::Scalar0P2, 0usize)]),
+        TK::Identifier => Vec::from(&[Shift(State::IdentifierS37)]),
+        TK::Number => Vec::from(&[Shift(State::NumberS28)]),
+        TK::Reference => Vec::from(&[Shift(State::ReferenceS29)]),
+        TK::QuotedStringDouble => Vec::from(&[Shift(State::QuotedStringDoubleS30)]),
+        TK::QuotedStringSingle => Vec::from(&[Shift(State::QuotedStringSingleS31)]),
+        TK::BlockString => Vec::from(&[Shift(State::BlockStringS32)]),
         _ => vec![],
     }
 }
-fn action_quotedstringdouble_s28(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_identifier_s27(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
+        TK::Colon => Vec::from(&[Shift(State::ColonS19)]),
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP8, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP8, 1usize)]),
+        TK::PluralKeyword => Vec::from(&[Shift(State::PluralKeywordS9)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP8, 1usize)]),
         _ => vec![],
     }
 }
-fn action_quotedstringsingle_s29(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_number_s28(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP4, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP4, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP4, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP4, 1usize)]),
         _ => vec![],
     }
 }
-fn action_fieldvalue_s30(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_reference_s29(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP7, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP7, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP7, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP7, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_quotedstringdouble_s30(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP1, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP1, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP1, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP1, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_quotedstringsingle_s31(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP2, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP2, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP2, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP2, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_blockstring_s32(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP3, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP3, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ScalarP3, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ScalarP3, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_fieldvalue_s33(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::Comma => Vec::from(&[Reduce(PK::FieldP1, 3usize)]),
         TK::Identifier => Vec::from(&[Reduce(PK::FieldP1, 3usize)]),
@@ -546,37 +652,56 @@ fn action_fieldvalue_s30(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> 
         _ => vec![],
     }
 }
-fn action_identifier_s31(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_scalar_s34(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Colon => Vec::from(&[Shift(State::ColonS34)]),
+        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP1, 1usize)]),
         _ => vec![],
     }
 }
-fn action_field_s32(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_list_s35(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Comma => Vec::from(&[Reduce(PK::FieldListP2, 3usize)]),
-        TK::Identifier => Vec::from(&[Reduce(PK::FieldListP2, 3usize)]),
-        TK::Semicolon => Vec::from(&[Reduce(PK::FieldListP2, 3usize)]),
+        TK::Comma => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::FieldValueP2, 1usize)]),
         _ => vec![],
     }
 }
-fn action_entitydefinition_s33(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_entitydefinition_s36(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::Semicolon => Vec::from(&[Shift(State::SemicolonS35)]),
+        TK::Semicolon => Vec::from(&[Shift(State::SemicolonS41)]),
         _ => vec![],
     }
 }
-fn action_colon_s34(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_identifier_s37(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::BooleanTrue => Vec::from(&[Shift(State::BooleanTrueS25)]),
-        TK::BooleanFalse => Vec::from(&[Shift(State::BooleanFalseS26)]),
-        TK::Number => Vec::from(&[Shift(State::NumberS27)]),
-        TK::QuotedStringDouble => Vec::from(&[Shift(State::QuotedStringDoubleS28)]),
-        TK::QuotedStringSingle => Vec::from(&[Shift(State::QuotedStringSingleS29)]),
+        TK::Comma => Vec::from(&[Reduce(PK::ScalarP8, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::ScalarP8, 1usize)]),
         _ => vec![],
     }
 }
-fn action_semicolon_s35(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_scalar_s38(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::Scalar1P2, 1usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::Scalar1P2, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_scalar1_s39(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Shift(State::CommaS42)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::Scalar0P1, 1usize)]),
+        _ => vec![],
+    }
+}
+fn action_scalar0_s40(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::RBracket => Vec::from(&[Shift(State::RBracketS43)]),
+        _ => vec![],
+    }
+}
+fn action_semicolon_s41(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Reduce(PK::PluralEntityP1, 6usize)]),
         TK::Identifier => Vec::from(&[Reduce(PK::PluralEntityP1, 6usize)]),
@@ -584,34 +709,71 @@ fn action_semicolon_s35(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
         _ => vec![],
     }
 }
-fn action_augl_s36(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_comma_s42(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
-        TK::STOP => Vec::from(&[Reduce(PK::LayoutP2, 0usize)]),
-        TK::WS => Vec::from(&[Shift(State::WSS37)]),
+        TK::BooleanTrue => Vec::from(&[Shift(State::BooleanTrueS24)]),
+        TK::BooleanFalse => Vec::from(&[Shift(State::BooleanFalseS25)]),
+        TK::RBracket => Vec::from(&[Shift(State::RBracketS44)]),
+        TK::Identifier => Vec::from(&[Shift(State::IdentifierS37)]),
+        TK::Number => Vec::from(&[Shift(State::NumberS28)]),
+        TK::Reference => Vec::from(&[Shift(State::ReferenceS29)]),
+        TK::QuotedStringDouble => Vec::from(&[Shift(State::QuotedStringDoubleS30)]),
+        TK::QuotedStringSingle => Vec::from(&[Shift(State::QuotedStringSingleS31)]),
+        TK::BlockString => Vec::from(&[Shift(State::BlockStringS32)]),
         _ => vec![],
     }
 }
-fn action_ws_s37(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_rbracket_s43(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ListP1, 3usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ListP1, 3usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ListP1, 3usize)]),
+        _ => vec![],
+    }
+}
+fn action_rbracket_s44(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::ListP2, 4usize)]),
+        TK::Identifier => Vec::from(&[Reduce(PK::ListP2, 4usize)]),
+        TK::Semicolon => Vec::from(&[Reduce(PK::ListP2, 4usize)]),
+        _ => vec![],
+    }
+}
+fn action_scalar_s45(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::Comma => Vec::from(&[Reduce(PK::Scalar1P1, 3usize)]),
+        TK::RBracket => Vec::from(&[Reduce(PK::Scalar1P1, 3usize)]),
+        _ => vec![],
+    }
+}
+fn action_augl_s46(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+    match token_kind {
+        TK::STOP => Vec::from(&[Reduce(PK::LayoutP2, 0usize)]),
+        TK::WS => Vec::from(&[Shift(State::WSS47)]),
+        _ => vec![],
+    }
+}
+fn action_ws_s47(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Reduce(PK::WS1P2, 1usize)]),
         TK::WS => Vec::from(&[Reduce(PK::WS1P2, 1usize)]),
         _ => vec![],
     }
 }
-fn action_layout_s38(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_layout_s48(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Accept]),
         _ => vec![],
     }
 }
-fn action_ws1_s39(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_ws1_s49(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Reduce(PK::LayoutP1, 1usize)]),
-        TK::WS => Vec::from(&[Shift(State::WSS40)]),
+        TK::WS => Vec::from(&[Shift(State::WSS50)]),
         _ => vec![],
     }
 }
-fn action_ws_s40(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
+fn action_ws_s50(token_kind: TokenKind) -> Vec<Action<State, ProdKind>> {
     match token_kind {
         TK::STOP => Vec::from(&[Reduce(PK::WS1P1, 2usize)]),
         TK::WS => Vec::from(&[Reduce(PK::WS1P1, 2usize)]),
@@ -653,11 +815,10 @@ fn goto_colon_s8(nonterm_kind: NonTermKind) -> State {
         NonTermKind::PluralEntity => State::PluralEntityS6,
         NonTermKind::SingularEntity => State::SingularEntityS7,
         NonTermKind::EntityDefinition => State::EntityDefinitionS13,
-        NonTermKind::NestedBlock1 => State::NestedBlock1S14,
-        NonTermKind::NestedBlock0 => State::NestedBlock0S15,
-        NonTermKind::NestedBlock => State::NestedBlockS16,
-        NonTermKind::FieldList => State::FieldListS17,
-        NonTermKind::Field => State::FieldS18,
+        NonTermKind::Item1 => State::Item1S14,
+        NonTermKind::Item0 => State::Item0S15,
+        NonTermKind::Item => State::ItemS16,
+        NonTermKind::Field => State::FieldS17,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
@@ -666,91 +827,92 @@ fn goto_colon_s8(nonterm_kind: NonTermKind) -> State {
         }
     }
 }
-fn goto_nestedblock1_s14(nonterm_kind: NonTermKind) -> State {
+fn goto_item1_s14(nonterm_kind: NonTermKind) -> State {
     match nonterm_kind {
         NonTermKind::Entity => State::EntityS12,
         NonTermKind::PluralEntity => State::PluralEntityS6,
         NonTermKind::SingularEntity => State::SingularEntityS7,
-        NonTermKind::NestedBlock => State::NestedBlockS22,
-        NonTermKind::FieldList => State::FieldListS17,
-        NonTermKind::Field => State::FieldS18,
+        NonTermKind::Item => State::ItemS21,
+        NonTermKind::Field => State::FieldS17,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::NestedBlock1S14
+                State::Item1S14
             )
         }
     }
 }
-fn goto_colon_s20(nonterm_kind: NonTermKind) -> State {
+fn goto_colon_s19(nonterm_kind: NonTermKind) -> State {
     match nonterm_kind {
         NonTermKind::Entity => State::EntityS12,
         NonTermKind::PluralEntity => State::PluralEntityS6,
         NonTermKind::SingularEntity => State::SingularEntityS7,
         NonTermKind::EntityDefinition => State::EntityDefinitionS13,
-        NonTermKind::NestedBlock1 => State::NestedBlock1S14,
-        NonTermKind::NestedBlock0 => State::NestedBlock0S15,
-        NonTermKind::NestedBlock => State::NestedBlockS16,
-        NonTermKind::FieldList => State::FieldListS17,
-        NonTermKind::Field => State::FieldS18,
-        NonTermKind::FieldValue => State::FieldValueS30,
+        NonTermKind::Item1 => State::Item1S14,
+        NonTermKind::Item0 => State::Item0S15,
+        NonTermKind::Item => State::ItemS16,
+        NonTermKind::Field => State::FieldS17,
+        NonTermKind::FieldValue => State::FieldValueS33,
+        NonTermKind::Scalar => State::ScalarS34,
+        NonTermKind::List => State::ListS35,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::ColonS20
+                State::ColonS19
             )
         }
     }
 }
-fn goto_comma_s23(nonterm_kind: NonTermKind) -> State {
-    match nonterm_kind {
-        NonTermKind::Field => State::FieldS32,
-        _ => {
-            panic!(
-                "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::CommaS23
-            )
-        }
-    }
-}
-fn goto_colon_s24(nonterm_kind: NonTermKind) -> State {
+fn goto_colon_s23(nonterm_kind: NonTermKind) -> State {
     match nonterm_kind {
         NonTermKind::Entity => State::EntityS12,
         NonTermKind::PluralEntity => State::PluralEntityS6,
         NonTermKind::SingularEntity => State::SingularEntityS7,
-        NonTermKind::EntityDefinition => State::EntityDefinitionS33,
-        NonTermKind::NestedBlock1 => State::NestedBlock1S14,
-        NonTermKind::NestedBlock0 => State::NestedBlock0S15,
-        NonTermKind::NestedBlock => State::NestedBlockS16,
-        NonTermKind::FieldList => State::FieldListS17,
-        NonTermKind::Field => State::FieldS18,
+        NonTermKind::EntityDefinition => State::EntityDefinitionS36,
+        NonTermKind::Item1 => State::Item1S14,
+        NonTermKind::Item0 => State::Item0S15,
+        NonTermKind::Item => State::ItemS16,
+        NonTermKind::Field => State::FieldS17,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::ColonS24
+                State::ColonS23
             )
         }
     }
 }
-fn goto_colon_s34(nonterm_kind: NonTermKind) -> State {
+fn goto_lbracket_s26(nonterm_kind: NonTermKind) -> State {
     match nonterm_kind {
-        NonTermKind::FieldValue => State::FieldValueS30,
+        NonTermKind::Scalar => State::ScalarS38,
+        NonTermKind::Scalar1 => State::Scalar1S39,
+        NonTermKind::Scalar0 => State::Scalar0S40,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::ColonS34
+                State::LBracketS26
             )
         }
     }
 }
-fn goto_augl_s36(nonterm_kind: NonTermKind) -> State {
+fn goto_comma_s42(nonterm_kind: NonTermKind) -> State {
     match nonterm_kind {
-        NonTermKind::Layout => State::LayoutS38,
-        NonTermKind::WS1 => State::WS1S39,
+        NonTermKind::Scalar => State::ScalarS45,
         _ => {
             panic!(
                 "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
-                State::AUGLS36
+                State::CommaS42
+            )
+        }
+    }
+}
+fn goto_augl_s46(nonterm_kind: NonTermKind) -> State {
+    match nonterm_kind {
+        NonTermKind::Layout => State::LayoutS48,
+        NonTermKind::WS1 => State::WS1S49,
+        _ => {
+            panic!(
+                "Invalid terminal kind ({nonterm_kind:?}) for GOTO state ({:?}).",
+                State::AUGLS46
             )
         }
     }
@@ -774,33 +936,43 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         action_identifier_s11,
         action_entity_s12,
         action_entitydefinition_s13,
-        action_nestedblock1_s14,
-        action_nestedblock0_s15,
-        action_nestedblock_s16,
-        action_fieldlist_s17,
-        action_field_s18,
-        action_identifier_s19,
-        action_colon_s20,
-        action_semicolon_s21,
-        action_nestedblock_s22,
-        action_comma_s23,
-        action_colon_s24,
-        action_booleantrue_s25,
-        action_booleanfalse_s26,
-        action_number_s27,
-        action_quotedstringdouble_s28,
-        action_quotedstringsingle_s29,
-        action_fieldvalue_s30,
-        action_identifier_s31,
-        action_field_s32,
-        action_entitydefinition_s33,
-        action_colon_s34,
-        action_semicolon_s35,
-        action_augl_s36,
-        action_ws_s37,
-        action_layout_s38,
-        action_ws1_s39,
-        action_ws_s40,
+        action_item1_s14,
+        action_item0_s15,
+        action_item_s16,
+        action_field_s17,
+        action_identifier_s18,
+        action_colon_s19,
+        action_semicolon_s20,
+        action_item_s21,
+        action_comma_s22,
+        action_colon_s23,
+        action_booleantrue_s24,
+        action_booleanfalse_s25,
+        action_lbracket_s26,
+        action_identifier_s27,
+        action_number_s28,
+        action_reference_s29,
+        action_quotedstringdouble_s30,
+        action_quotedstringsingle_s31,
+        action_blockstring_s32,
+        action_fieldvalue_s33,
+        action_scalar_s34,
+        action_list_s35,
+        action_entitydefinition_s36,
+        action_identifier_s37,
+        action_scalar_s38,
+        action_scalar1_s39,
+        action_scalar0_s40,
+        action_semicolon_s41,
+        action_comma_s42,
+        action_rbracket_s43,
+        action_rbracket_s44,
+        action_scalar_s45,
+        action_augl_s46,
+        action_ws_s47,
+        action_layout_s48,
+        action_ws1_s49,
+        action_ws_s50,
     ],
     gotos: [
         goto_aug_s0,
@@ -817,17 +989,24 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         goto_invalid,
         goto_invalid,
         goto_invalid,
-        goto_nestedblock1_s14,
+        goto_item1_s14,
+        goto_invalid,
+        goto_invalid,
+        goto_invalid,
+        goto_invalid,
+        goto_colon_s19,
+        goto_invalid,
+        goto_invalid,
+        goto_invalid,
+        goto_colon_s23,
+        goto_invalid,
+        goto_invalid,
+        goto_lbracket_s26,
         goto_invalid,
         goto_invalid,
         goto_invalid,
         goto_invalid,
         goto_invalid,
-        goto_colon_s20,
-        goto_invalid,
-        goto_invalid,
-        goto_comma_s23,
-        goto_colon_s24,
         goto_invalid,
         goto_invalid,
         goto_invalid,
@@ -837,9 +1016,12 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         goto_invalid,
         goto_invalid,
         goto_invalid,
-        goto_colon_s34,
         goto_invalid,
-        goto_augl_s36,
+        goto_comma_s42,
+        goto_invalid,
+        goto_invalid,
+        goto_invalid,
+        goto_augl_s46,
         goto_invalid,
         goto_invalid,
         goto_invalid,
@@ -854,77 +1036,6 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
-        ],
-        [
-            Some((TK::PluralKeyword, true)),
-            Some((TK::Colon, true)),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        [Some((TK::STOP, false)), None, None, None, None, None, None],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        [Some((TK::STOP, false)), None, None, None, None, None, None],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
             None,
             None,
             None,
@@ -937,6 +1048,81 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ],
         [
             Some((TK::Semicolon, true)),
@@ -946,9 +1132,39 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
         ],
         [
-            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::PluralKeyword, true)),
+            Some((TK::Colon, true)),
+            None,
+            None,
             None,
             None,
             None,
@@ -964,9 +1180,15 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
         ],
         [
             Some((TK::Semicolon, true)),
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -977,6 +1199,33 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         [
             Some((TK::Semicolon, true)),
             Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Semicolon, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -991,25 +1240,33 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
         ],
         [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
+            Some((TK::Colon, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
             None,
         ],
-        [Some((TK::Colon, true)), None, None, None, None, None, None],
         [
             Some((TK::BooleanFalse, true)),
             Some((TK::BooleanTrue, true)),
+            Some((TK::LBracket, true)),
             Some((TK::Semicolon, true)),
             Some((TK::Identifier, false)),
             Some((TK::Number, false)),
+            Some((TK::Reference, false)),
             Some((TK::QuotedStringDouble, false)),
             Some((TK::QuotedStringSingle, false)),
+            Some((TK::BlockString, false)),
         ],
         [
             Some((TK::STOP, true)),
@@ -1019,6 +1276,21 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ],
         [
             Some((TK::Semicolon, true)),
@@ -1028,12 +1300,6 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
-        ],
-        [
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
             None,
             None,
             None,
@@ -1041,6 +1307,9 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         [
             Some((TK::Semicolon, true)),
             Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1049,8 +1318,11 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         ],
         [
             Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
             Some((TK::Semicolon, true)),
             Some((TK::Identifier, false)),
+            None,
+            None,
             None,
             None,
             None,
@@ -1058,61 +1330,9 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         ],
         [
             Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
             Some((TK::Semicolon, true)),
             Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [Some((TK::Colon, true)), None, None, None, None, None, None],
-        [
-            Some((TK::Comma, true)),
-            Some((TK::Semicolon, true)),
-            Some((TK::Identifier, false)),
-            None,
-            None,
-            None,
-            None,
-        ],
-        [
-            Some((TK::Semicolon, true)),
             None,
             None,
             None,
@@ -1123,9 +1343,180 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         [
             Some((TK::BooleanFalse, true)),
             Some((TK::BooleanTrue, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Identifier, false)),
             Some((TK::Number, false)),
+            Some((TK::Reference, false)),
             Some((TK::QuotedStringDouble, false)),
             Some((TK::QuotedStringSingle, false)),
+            Some((TK::BlockString, false)),
+            None,
+        ],
+        [
+            Some((TK::PluralKeyword, true)),
+            Some((TK::Colon, true)),
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Semicolon, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::RBracket, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
         ],
@@ -1137,6 +1528,57 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::BooleanFalse, true)),
+            Some((TK::BooleanTrue, true)),
+            Some((TK::RBracket, true)),
+            Some((TK::Identifier, false)),
+            Some((TK::Number, false)),
+            Some((TK::Reference, false)),
+            Some((TK::QuotedStringDouble, false)),
+            Some((TK::QuotedStringSingle, false)),
+            Some((TK::BlockString, false)),
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::Semicolon, true)),
+            Some((TK::Identifier, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::Comma, true)),
+            Some((TK::RBracket, true)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ],
         [
             Some((TK::STOP, true)),
@@ -1146,6 +1588,33 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, true)),
+            Some((TK::WS, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        [
+            Some((TK::STOP, false)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ],
         [
             Some((TK::STOP, true)),
@@ -1155,13 +1624,6 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
             None,
             None,
             None,
-        ],
-        [Some((TK::STOP, false)), None, None, None, None, None, None],
-        [
-            Some((TK::STOP, true)),
-            Some((TK::WS, false)),
-            None,
-            None,
             None,
             None,
             None,
@@ -1169,6 +1631,9 @@ pub(crate) static PARSER_DEFINITION: ColaParserDefinition = ColaParserDefinition
         [
             Some((TK::STOP, true)),
             Some((TK::WS, false)),
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1321,6 +1786,8 @@ pub(crate) static RECOGNIZERS: [TokenRecognizer; TERMINAL_COUNT] = [
     TokenRecognizer(TokenKind::BooleanFalse, Recognizer::StrMatch("false")),
     TokenRecognizer(TokenKind::Colon, Recognizer::StrMatch(":")),
     TokenRecognizer(TokenKind::Comma, Recognizer::StrMatch(",")),
+    TokenRecognizer(TokenKind::LBracket, Recognizer::StrMatch("[")),
+    TokenRecognizer(TokenKind::RBracket, Recognizer::StrMatch("]")),
     TokenRecognizer(
         TokenKind::Identifier,
         Recognizer::RegexMatch(Lazy::new(|| {
@@ -1330,10 +1797,24 @@ pub(crate) static RECOGNIZERS: [TokenRecognizer; TERMINAL_COUNT] = [
     TokenRecognizer(
         TokenKind::Number,
         Recognizer::RegexMatch(Lazy::new(|| {
-            Regex::new(concat!("^", "[+-]?[0-9]+(\\.[0-9]+)?")).unwrap()
+            Regex::new(concat!(
+                "^",
+                "[+-]?[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?"
+            ))
+            .unwrap()
         })),
     ),
     TokenRecognizer(TokenKind::PluralKeyword, Recognizer::StrMatch("plural")),
+    TokenRecognizer(
+        TokenKind::Reference,
+        Recognizer::RegexMatch(Lazy::new(|| {
+            Regex::new(concat!(
+                "^",
+                "@[a-zA-Z_][a-zA-Z0-9_.-]*(/[a-zA-Z_][a-zA-Z0-9_.-]*)*"
+            ))
+            .unwrap()
+        })),
+    ),
     TokenRecognizer(
         TokenKind::QuotedStringDouble,
         Recognizer::RegexMatch(Lazy::new(|| {
@@ -1346,13 +1827,13 @@ pub(crate) static RECOGNIZERS: [TokenRecognizer; TERMINAL_COUNT] = [
             Regex::new(concat!("^", "'([^'\\\\]|\\\\.)*'")).unwrap()
         })),
     ),
-    TokenRecognizer(TokenKind::Semicolon, Recognizer::StrMatch(";")),
     TokenRecognizer(
-        TokenKind::UnquotedString,
+        TokenKind::BlockString,
         Recognizer::RegexMatch(Lazy::new(|| {
-            Regex::new(concat!("^", "[a-zA-Z0-9_.-]+")).unwrap()
+            Regex::new(concat!("^", "\"\"\"(?s:.*?)\"\"\"")).unwrap()
         })),
     ),
+    TokenRecognizer(TokenKind::Semicolon, Recognizer::StrMatch(";")),
     TokenRecognizer(
         TokenKind::WS,
         Recognizer::RegexMatch(Lazy::new(|| Regex::new(concat!("^", "\\s+")).unwrap())),
@@ -1385,14 +1866,20 @@ impl<'i> LRBuilder<'i, Input, Context<'i, Input>, State, ProdKind, TokenKind> fo
             TokenKind::BooleanFalse => Terminal::BooleanFalse,
             TokenKind::Colon => Terminal::Colon,
             TokenKind::Comma => Terminal::Comma,
+            TokenKind::LBracket => Terminal::LBracket,
+            TokenKind::RBracket => Terminal::RBracket,
             TokenKind::Identifier => Terminal::Identifier(cola_actions::identifier(context, token)),
             TokenKind::Number => Terminal::Number(cola_actions::number(context, token)),
             TokenKind::PluralKeyword => Terminal::PluralKeyword,
+            TokenKind::Reference => Terminal::Reference(cola_actions::reference(context, token)),
             TokenKind::QuotedStringDouble => {
                 Terminal::QuotedStringDouble(cola_actions::quoted_string_double(context, token))
             }
             TokenKind::QuotedStringSingle => {
                 Terminal::QuotedStringSingle(cola_actions::quoted_string_single(context, token))
+            }
+            TokenKind::BlockString => {
+                Terminal::BlockString(cola_actions::block_string(context, token))
             }
             TokenKind::Semicolon => Terminal::Semicolon,
             _ => panic!("Shift of unreachable terminal!"),
@@ -1529,103 +2016,83 @@ impl<'i> LRBuilder<'i, Input, Context<'i, Input>, State, ProdKind, TokenKind> fo
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
-                    Symbol::NonTerminal(NonTerminal::NestedBlock0(p0)) => {
-                        NonTerminal::EntityDefinition(
-                            cola_actions::entity_definition_nested_block0(context, p0),
-                        )
-                    }
+                    Symbol::NonTerminal(NonTerminal::Item0(p0)) => NonTerminal::EntityDefinition(
+                        cola_actions::entity_definition_item0(context, p0),
+                    ),
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::NestedBlock1P1 => {
+            ProdKind::Item1P1 => {
                 let mut i = self
                     .res_stack
                     .split_off(self.res_stack.len() - 2usize)
                     .into_iter();
                 match (i.next().unwrap(), i.next().unwrap()) {
                     (
-                        Symbol::NonTerminal(NonTerminal::NestedBlock1(p0)),
-                        Symbol::NonTerminal(NonTerminal::NestedBlock(p1)),
-                    ) => NonTerminal::NestedBlock1(cola_actions::nested_block1_c1(context, p0, p1)),
+                        Symbol::NonTerminal(NonTerminal::Item1(p0)),
+                        Symbol::NonTerminal(NonTerminal::Item(p1)),
+                    ) => NonTerminal::Item1(cola_actions::item1_c1(context, p0, p1)),
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::NestedBlock1P2 => {
+            ProdKind::Item1P2 => {
                 let mut i = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
-                    Symbol::NonTerminal(NonTerminal::NestedBlock(p0)) => NonTerminal::NestedBlock1(
-                        cola_actions::nested_block1_nested_block(context, p0),
-                    ),
-                    _ => panic!("Invalid symbol parse stack data."),
-                }
-            }
-            ProdKind::NestedBlock0P1 => {
-                let mut i = self
-                    .res_stack
-                    .split_off(self.res_stack.len() - 1usize)
-                    .into_iter();
-                match i.next().unwrap() {
-                    Symbol::NonTerminal(NonTerminal::NestedBlock1(p0)) => {
-                        NonTerminal::NestedBlock0(cola_actions::nested_block0_nested_block1(
-                            context, p0,
-                        ))
+                    Symbol::NonTerminal(NonTerminal::Item(p0)) => {
+                        NonTerminal::Item1(cola_actions::item1_item(context, p0))
                     }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::NestedBlock0P2 => {
-                NonTerminal::NestedBlock0(cola_actions::nested_block0_empty(context))
-            }
-            ProdKind::NestedBlockP1 => {
+            ProdKind::Item0P1 => {
                 let mut i = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
-                    Symbol::NonTerminal(NonTerminal::FieldList(p0)) => {
-                        NonTerminal::NestedBlock(cola_actions::nested_block_field_list(context, p0))
+                    Symbol::NonTerminal(NonTerminal::Item1(p0)) => {
+                        NonTerminal::Item0(cola_actions::item0_item1(context, p0))
                     }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::NestedBlockP2 => {
-                let mut i = self
-                    .res_stack
-                    .split_off(self.res_stack.len() - 1usize)
-                    .into_iter();
-                match i.next().unwrap() {
-                    Symbol::NonTerminal(NonTerminal::Entity(p0)) => {
-                        NonTerminal::NestedBlock(cola_actions::nested_block_entity(context, p0))
-                    }
-                    _ => panic!("Invalid symbol parse stack data."),
-                }
-            }
-            ProdKind::FieldListP1 => {
+            ProdKind::Item0P2 => NonTerminal::Item0(cola_actions::item0_empty(context)),
+            ProdKind::ItemP1 => {
                 let mut i = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
                     Symbol::NonTerminal(NonTerminal::Field(p0)) => {
-                        NonTerminal::FieldList(cola_actions::field_list_field(context, p0))
+                        NonTerminal::Item(cola_actions::item_field1(context, p0))
                     }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::FieldListP2 => {
+            ProdKind::ItemP2 => {
                 let mut i = self
                     .res_stack
-                    .split_off(self.res_stack.len() - 3usize)
+                    .split_off(self.res_stack.len() - 2usize)
                     .into_iter();
-                match (i.next().unwrap(), i.next().unwrap(), i.next().unwrap()) {
-                    (
-                        Symbol::NonTerminal(NonTerminal::FieldList(p0)),
-                        _,
-                        Symbol::NonTerminal(NonTerminal::Field(p1)),
-                    ) => NonTerminal::FieldList(cola_actions::field_list_c2(context, p0, p1)),
+                match (i.next().unwrap(), i.next().unwrap()) {
+                    (Symbol::NonTerminal(NonTerminal::Field(p0)), _) => {
+                        NonTerminal::Item(cola_actions::item_field2(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ItemP3 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::NonTerminal(NonTerminal::Entity(p0)) => {
+                        NonTerminal::Item(cola_actions::item_entity(context, p0))
+                    }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
@@ -1649,9 +2116,9 @@ impl<'i> LRBuilder<'i, Input, Context<'i, Input>, State, ProdKind, TokenKind> fo
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
-                    Symbol::Terminal(Terminal::QuotedStringDouble(p0)) => NonTerminal::FieldValue(
-                        cola_actions::field_value_quoted_string_double(context, p0),
-                    ),
+                    Symbol::NonTerminal(NonTerminal::Scalar(p0)) => {
+                        NonTerminal::FieldValue(cola_actions::field_value_scalar(context, p0))
+                    }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
@@ -1661,37 +2128,165 @@ impl<'i> LRBuilder<'i, Input, Context<'i, Input>, State, ProdKind, TokenKind> fo
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
-                    Symbol::Terminal(Terminal::QuotedStringSingle(p0)) => NonTerminal::FieldValue(
-                        cola_actions::field_value_quoted_string_single(context, p0),
-                    ),
+                    Symbol::NonTerminal(NonTerminal::List(p0)) => {
+                        NonTerminal::FieldValue(cola_actions::field_value_list(context, p0))
+                    }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::FieldValueP3 => {
+            ProdKind::ScalarP1 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::Terminal(Terminal::QuotedStringDouble(p0)) => {
+                        NonTerminal::Scalar(cola_actions::scalar_quoted_string_double(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ScalarP2 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::Terminal(Terminal::QuotedStringSingle(p0)) => {
+                        NonTerminal::Scalar(cola_actions::scalar_quoted_string_single(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ScalarP3 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::Terminal(Terminal::BlockString(p0)) => {
+                        NonTerminal::Scalar(cola_actions::scalar_block_string(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ScalarP4 => {
                 let mut i = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
                 match i.next().unwrap() {
                     Symbol::Terminal(Terminal::Number(p0)) => {
-                        NonTerminal::FieldValue(cola_actions::field_value_number(context, p0))
+                        NonTerminal::Scalar(cola_actions::scalar_number(context, p0))
                     }
                     _ => panic!("Invalid symbol parse stack data."),
                 }
             }
-            ProdKind::FieldValueP4 => {
+            ProdKind::ScalarP5 => {
                 let _ = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
-                NonTerminal::FieldValue(cola_actions::field_value_boolean_true(context))
+                NonTerminal::Scalar(cola_actions::scalar_boolean_true(context))
             }
-            ProdKind::FieldValueP5 => {
+            ProdKind::ScalarP6 => {
                 let _ = self
                     .res_stack
                     .split_off(self.res_stack.len() - 1usize)
                     .into_iter();
-                NonTerminal::FieldValue(cola_actions::field_value_boolean_false(context))
+                NonTerminal::Scalar(cola_actions::scalar_boolean_false(context))
+            }
+            ProdKind::ScalarP7 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::Terminal(Terminal::Reference(p0)) => {
+                        NonTerminal::Scalar(cola_actions::scalar_reference(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ScalarP8 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::Terminal(Terminal::Identifier(p0)) => {
+                        NonTerminal::Scalar(cola_actions::scalar_identifier(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::ListP1 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 3usize)
+                    .into_iter();
+                match (i.next().unwrap(), i.next().unwrap(), i.next().unwrap()) {
+                    (_, Symbol::NonTerminal(NonTerminal::Scalar0(p0)), _) => {
+                        NonTerminal::List(cola_actions::list_scalar0(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::Scalar1P1 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 3usize)
+                    .into_iter();
+                match (i.next().unwrap(), i.next().unwrap(), i.next().unwrap()) {
+                    (
+                        Symbol::NonTerminal(NonTerminal::Scalar1(p0)),
+                        _,
+                        Symbol::NonTerminal(NonTerminal::Scalar(p1)),
+                    ) => NonTerminal::Scalar1(cola_actions::scalar1_c1(context, p0, p1)),
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::Scalar1P2 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::NonTerminal(NonTerminal::Scalar(p0)) => {
+                        NonTerminal::Scalar1(cola_actions::scalar1_scalar(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::Scalar0P1 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 1usize)
+                    .into_iter();
+                match i.next().unwrap() {
+                    Symbol::NonTerminal(NonTerminal::Scalar1(p0)) => {
+                        NonTerminal::Scalar0(cola_actions::scalar0_scalar1(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
+            }
+            ProdKind::Scalar0P2 => NonTerminal::Scalar0(cola_actions::scalar0_empty(context)),
+            ProdKind::ListP2 => {
+                let mut i = self
+                    .res_stack
+                    .split_off(self.res_stack.len() - 4usize)
+                    .into_iter();
+                match (
+                    i.next().unwrap(),
+                    i.next().unwrap(),
+                    i.next().unwrap(),
+                    i.next().unwrap(),
+                ) {
+                    (_, Symbol::NonTerminal(NonTerminal::Scalar1(p0)), _, _) => {
+                        NonTerminal::List(cola_actions::list_scalar1(context, p0))
+                    }
+                    _ => panic!("Invalid symbol parse stack data."),
+                }
             }
             _ => panic!("Reduce of unreachable nonterminal!"),
         };

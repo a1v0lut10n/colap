@@ -96,26 +96,45 @@ insignificant except as a separator. Indentation carries no meaning.
   keyword is recognised only where a keyword can stand; elsewhere the same
   spelling is an identifier. Using keywords as names is accepted and not
   recommended: editor highlighting shows them as keywords.
-- **Punctuation**: `:` after a name, `,` between fields, `;` ending an
-  entity.
-- **String**: text between double quotes, `"…"`, or single quotes, `'…'`.
-  A backslash escapes the next character for the purpose of finding the
-  closing quote; the text between the quotes is kept **as written**,
-  escapes included, and may span lines. Decoding escapes is an open
-  decision (section 9).
-- **Number**: `[+-]?[0-9]+(\.[0-9]+)?`. With a decimal point the value is
-  a 64-bit float; without, a 64-bit signed integer, and a digit string
-  outside that range is an error. There is no exponent form.
+- **Punctuation**: `:` after a name, `,` after a field, `;` ending an
+  entity, `[` and `]` around a list.
+- **String**: text between double quotes, `"…"`, or single quotes, `'…'`,
+  which may span lines. A backslash starts an escape: `\"`, `\'`, `\\`,
+  `\n`, `\r`, `\t`, and `\u{…}` with one to six hex digits. Any other
+  escape is an error. The value is the decoded text.
+- **Block string**: text between `"""` and `"""`, for prose. No escape is
+  decoded and a `"` inside is literal. The value is the text with its
+  first line dropped when blank, its last line dropped with the newline
+  before it when blank, and the longest common leading whitespace of the
+  non-blank lines removed from every line.
+- **Number**: `[+-]?[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?`.
+  Underscores separate digits and are dropped. With a decimal point or an
+  exponent the value is a 64-bit float; without, a 64-bit signed integer,
+  and a digit string outside that range is an error. There is no leading
+  `.`.
 - **Boolean**: `true` or `false`.
+- **Symbol**: an identifier in value position, `basis: parsed`. `plural`
+  is a symbol there, since it is a keyword only where a keyword can stand.
+- **Reference**: `@` followed by identifiers joined by `/`:
+  `@claims/cl-1`. Section 5.5 says what it must name.
 - There are no comments.
 
 ```cola
 lexical:
     name: 'single-quoted',
     quoted: "say \"hi\"",
+    gloss: """
+        Two lines of prose,
+        indented as the author likes.
+        """,
     ratio: 0.75,
     count: -3,
-    on: true
+    big: 1_000_000,
+    small: 1.5e-3,
+    on: true,
+    basis: parsed,
+    see: @lexical,
+    tags: [alpha, "two words", 3]
 ;
 ```
 
@@ -128,23 +147,28 @@ Block        = { Entity } ;
 Entity       = Plural | Singular ;
 Plural       = Identifier "plural" Identifier ":" Definition ";" ;
 Singular     = Identifier ":" Definition ";" ;
-Definition   = { FieldList | Entity } ;
-FieldList    = Field { "," Field } ;
+Definition   = { Field [ "," ] | Entity } ;
 Field        = Identifier ":" Value ;
-Value        = String | Number | Boolean ;
+Value        = Scalar | List ;
+Scalar       = String | BlockString | Number | Boolean | Symbol | Reference ;
+List         = "[" [ Scalar { "," Scalar } [ "," ] ] "]" ;
 ```
 
-A definition is any interleaving of field lists and nested entities. A
-comma separates fields within one list; there is no comma after the last
-field of a list, and none between a field and an entity. An entity may be
-empty (`name:;`), which a reader reports as a warning.
+A definition is any interleaving of fields and nested entities. A comma
+may follow a field, and that is how fields are separated: one comma, and
+a trailing one before `;` or before a nested entity is allowed. A comma
+never follows an entity. The reader also accepts two fields with no
+comma between them; the canonical layout (section 7) always writes the
+comma. A list holds scalars, never another list, and may be empty or end
+in a comma. An entity may be empty (`name:;`), which a reader reports as
+a warning.
 
 ```cola
 grammar plural grammars:
     nested:
-        a: 1, b: 2
+        a: 1, b: 2,
         inner: c: 3;
-        d: 4
+        d: [4, 5,],
     ;
 ;
 ```
@@ -219,9 +243,17 @@ error.
 
 ### 5.5 Values
 
-A field's value is an integer, a float, a boolean or a string, as section
-3 lexes it. A string's value is the raw text between its quotes. Type is
-decided by the literal alone: `8` is an integer and `8.0` a float.
+A field's value is an integer, a float, a boolean, a string, a symbol, a
+reference, or a list of those, as section 3 lexes them. Type is decided
+by the literal alone: `8` is an integer, `8.0` and `8e0` are floats,
+`"parsed"` is a string and `parsed` a symbol.
+
+A reference's path names an entity from the root the way section 5.2
+names it: each segment is the singular or plural name of a plural, the
+key of an entry, or the slot of a singular entity. Every reference in a
+document, in a list or not, must resolve in the finished model; one that
+does not is an error at its field. A reference may point forward, and
+into another block of the same document.
 
 ## 6. Diagnostics
 
@@ -239,7 +271,10 @@ path: severity: message            (no location)
 ```
 
 A duplicate's message names the entity and ends with the first location:
-`duplicate entry `cl-1` in `claim`; first at 5:5`.
+`duplicate entry `cl-1` in `claim`; first at 5:5`. An unknown escape
+reads `unknown escape `\q``, a reference to nothing `unresolved
+reference `@claims/cl-9``, and an integer past 64 bits `integer out of
+range: N`.
 
 Warnings a reader must give:
 
@@ -257,17 +292,28 @@ tools are byte-deterministic and formatting is idempotent. The layout is a
 pure function of the model:
 
 - four spaces of indentation per nesting level;
-- an entity with no children whose one-line form fits in 80 columns is
-  written on one line: `name: a: 1, b: "x";`. Otherwise its header stands
-  alone, each field on its own line with `,` after all but the last, child
-  entities follow, and `;` closes on its own line at the header's
-  indentation;
+- an entity with no children whose one-line form fits in 80 columns and
+  holds no multi-line string is written on one line:
+  `name: a: 1, b: "x";`. Otherwise its header stands alone, each field on
+  its own line ending in `,`, the last included, so that appending a field
+  never touches the line before it; child entities follow, and `;` closes
+  on its own line at the header's indentation;
 - fields come before child entities, both in source order;
-- an integer is written in decimal without a sign for non-negative values;
-  a float always carries a decimal point; booleans are `true` and `false`;
-- a string is double-quoted unless its raw text contains an unescaped
-  double quote, in which case it is single-quoted. The raw text is never
-  changed.
+- an integer is written in decimal without a sign for non-negative values
+  and without digit separators; a float always carries a decimal point,
+  and takes the exponent form (`1.0e300`) when its plain decimal would run
+  past twenty characters; booleans are `true` and `false`; a symbol is
+  bare and a reference is `@path`;
+- a list is written `[a, b, c]` on its field's line when that line fits in
+  80 columns, otherwise one element per line, each ending in `,`, one
+  level deeper, with `]` at the field's indentation; an empty list is
+  `[]`;
+- a string containing a newline is written as a block string whose lines
+  stand one level deeper than its field and whose closing `"""` stands
+  at the field's indentation, when that form reads back as the same
+  value; any other string is on one line, double-quoted with `\\`, `\"`,
+  `\n`, `\r`, `\t` and control characters escaped, except that a string
+  containing `"` and no `'` is single-quoted.
 
 Formatting a literate document rewrites only the bodies of its cola
 fences, each block on its own; prose and foreign fences are untouched, and
@@ -279,7 +325,11 @@ canonical:
     short: a: 1, b: "x";
     long:
         first: "a value that is long enough to push this entity past the width",
-        second: 2
+        second: 2,
+        gloss: """
+            Two lines
+            of prose.
+        """,
     ;
 ;
 ```
@@ -298,16 +348,14 @@ The following are not part of the language as specified. Each has a task
 and will be decided in a design record; this document is updated when a
 decision is accepted.
 
-- **Value language**: bare symbols, lists of scalars, references,
-  comments, decoded string escapes and raw or indented multi-line strings,
-  exponents and digit separators in numbers, typed date and instant
-  literals, trailing commas
-  (`docs/tasks/2026-10/2026-10-29-value-language-extensions.md`).
+- **Comments**: `//` to the end of the line inside cola blocks, carried
+  through the canonical layout; accepted in
+  `docs/design/2026-10-30-value-language.md` and not yet implemented.
 - **Schemas**: declaring the shape a document must have, and checking
   against it (`docs/tasks/2026-10/2026-10-29-schema-validation.md`).
+  Typed date and instant literals and null values are deferred to it.
 
-Until then: there are no trailing commas, no comments, and escapes are
-kept raw.
+Until then: there are no comments.
 
 ## 10. The conformance corpus
 

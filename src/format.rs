@@ -28,14 +28,16 @@ impl Formatted {
     }
 }
 
-/// One block body, parsed alone and written canonically.
+/// One block body, parsed alone and written canonically. References
+/// are not resolved here: they may point into another block, and the
+/// whole document was checked before any block is formatted.
 fn canonical_body(body: &str, path: Option<&Path>, line_offset: u32) -> Result<String, Error> {
     let ast = cola::ColaParser::new()
         .parse(body)
         .map_err(|e| Error::from_rustemo(e, path, line_offset))?;
     let mut builder = ModelBuilder::new(path);
     builder.add_block(&ast, line_offset);
-    Ok(builder.finish()?.to_cola())
+    Ok(builder.finish_block()?.to_cola())
 }
 
 /// Format a literate document: only the bodies of cola fences change.

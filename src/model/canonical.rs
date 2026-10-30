@@ -6,62 +6,68 @@
 //! - four spaces of indentation per level;
 //! - an entity with no children whose one-line form fits in
 //!   [`WIDTH`] columns is written on one line, otherwise one field per
-//!   line and the closing `;` on its own line;
-//! - fields before child entities, in source order, no trailing comma;
-//! - floats always carry a decimal point, so `8.0` stays a float;
-//! - strings are double-quoted unless their raw text contains an
-//!   unescaped double quote, then single-quoted, so the text between
-//!   the quotes is unchanged (escapes are not decoded yet).
+//!   line, every field line ending in `,` (the last included, so an
+//!   append never touches the line before it), and the closing `;` on
+//!   its own line;
+//! - fields before child entities, in source order;
+//! - a list fits on its field's line or has one element per line,
+//!   each ending in `,`, with `]` at the field's indentation;
+//! - a string with a newline is a `"""` block when that reads back
+//!   exactly, otherwise a quoted one-liner; see [`literal`].
 
 use crate::model::config_model::{ConfigModel, ConfigValue, NodeId};
+use crate::model::literal;
+
+pub use crate::model::literal::{float_text, quote};
 
 /// Line width beyond which an entity is written one field per line.
 pub const WIDTH: usize = 80;
 const INDENT: &str = "    ";
 
-/// A float as cola text: `{}` never uses an exponent for `f64`, and a
-/// decimal point is added when `{}` would print an integer.
-pub fn float_text(value: f64) -> String {
-    let text = format!("{value}");
-    if text.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
-        format!("{text}.0")
-    } else {
-        text
-    }
-}
-
-fn has_unescaped(raw: &str, quote: char) -> bool {
-    let mut chars = raw.chars();
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            chars.next();
-        } else if c == quote {
-            return true;
-        }
-    }
-    false
-}
-
-/// A string as cola text, quoted so that the raw text is unchanged.
-pub fn quote(raw: &str) -> String {
-    if !has_unescaped(raw, '"') {
-        format!("\"{raw}\"")
-    } else if !has_unescaped(raw, '\'') {
-        format!("'{raw}'")
-    } else {
-        // Only reachable for a model built through the API: parsed text
-        // never carries both quotes unescaped.
-        format!("\"{}\"", raw.replace('"', "\\\""))
-    }
-}
-
-/// A value as cola text.
+/// A value as one-line cola text.
 pub fn value_text(value: &ConfigValue) -> String {
     match value {
         ConfigValue::Integer(i) => i.to_string(),
         ConfigValue::Float(f) => float_text(*f),
         ConfigValue::Boolean(b) => b.to_string(),
         ConfigValue::String(s) => quote(s),
+        ConfigValue::Symbol(s) => s.clone(),
+        ConfigValue::Reference(path) => format!("@{path}"),
+        ConfigValue::List(items) => {
+            let items: Vec<String> = items.iter().map(value_text).collect();
+            format!("[{}]", items.join(", "))
+        }
+    }
+}
+
+fn fits(line: &str) -> bool {
+    line.chars().count() <= WIDTH
+}
+
+/// A field on its own line at `depth`, with its trailing comma.
+fn field_lines(name: &str, value: &ConfigValue, depth: usize, out: &mut String) {
+    let indent = INDENT.repeat(depth);
+    let one_line = format!("{indent}{name}: {},", value_text(value));
+    match value {
+        ConfigValue::List(items) if !items.is_empty() && !fits(&one_line) => {
+            out.push_str(&format!("{indent}{name}: [\n"));
+            let inner = INDENT.repeat(depth + 1);
+            for item in items {
+                out.push_str(&format!("{inner}{},\n", value_text(item)));
+            }
+            out.push_str(&format!("{indent}],\n"));
+        }
+        ConfigValue::String(s) if s.contains('\n') => match literal::block(s, &indent, INDENT) {
+            Some(block) => out.push_str(&format!("{indent}{name}: {block},\n")),
+            None => {
+                out.push_str(&one_line);
+                out.push('\n');
+            }
+        },
+        _ => {
+            out.push_str(&one_line);
+            out.push('\n');
+        }
     }
 }
 
@@ -72,19 +78,19 @@ fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String)
     let entity = node.borrow();
     let indent = INDENT.repeat(depth);
     let header = format!("{}:", entity.declaration());
-    let fields: Vec<String> = entity
-        .fields
-        .iter()
-        .map(|f| format!("{}: {}", f.name, value_text(&f.value)))
-        .collect();
 
     if entity.children.is_empty() {
+        let fields: Vec<String> = entity
+            .fields
+            .iter()
+            .map(|f| format!("{}: {}", f.name, value_text(&f.value)))
+            .collect();
         let one_line = if fields.is_empty() {
             format!("{indent}{header};")
         } else {
             format!("{indent}{header} {};", fields.join(", "))
         };
-        if one_line.chars().count() <= WIDTH {
+        if fits(&one_line) && !entity.fields.iter().any(|f| has_newline(&f.value)) {
             out.push_str(&one_line);
             out.push('\n');
             return;
@@ -94,21 +100,20 @@ fn write_entity(model: &ConfigModel, id: NodeId, depth: usize, out: &mut String)
     out.push_str(&indent);
     out.push_str(&header);
     out.push('\n');
-    let inner = INDENT.repeat(depth + 1);
-    let last = fields.len().saturating_sub(1);
-    for (i, field) in fields.iter().enumerate() {
-        out.push_str(&inner);
-        out.push_str(field);
-        if i < last {
-            out.push(',');
-        }
-        out.push('\n');
+    for field in &entity.fields {
+        field_lines(&field.name, &field.value, depth + 1, out);
     }
     for &child in &entity.children {
         write_entity(model, child, depth + 1, out);
     }
     out.push_str(&indent);
     out.push_str(";\n");
+}
+
+/// Whether the one-line form of the value would hold a newline, which
+/// only a string can.
+fn has_newline(value: &ConfigValue) -> bool {
+    matches!(value, ConfigValue::String(s) if s.contains('\n'))
 }
 
 impl ConfigModel {
@@ -129,22 +134,30 @@ impl ConfigModel {
 mod tests {
     use super::*;
 
-    #[test]
-    fn floats_keep_their_point() {
-        assert_eq!(float_text(8.0), "8.0");
-        assert_eq!(float_text(-3.0), "-3.0");
-        assert_eq!(float_text(0.5), "0.5");
-        assert_eq!(float_text(1048576.25), "1048576.25");
+    fn model_with(fields: &[(&str, ConfigValue)]) -> ConfigModel {
+        let mut model = ConfigModel::new();
+        let root = model.root_id();
+        let a = model.add_entity(root, "a", None, None).unwrap();
+        for (name, value) in fields {
+            model.add_field_to_entity(a, name, value.clone()).unwrap();
+        }
+        model
     }
 
     #[test]
-    fn strings_keep_their_raw_text() {
-        assert_eq!(quote("plain"), "\"plain\"");
-        assert_eq!(quote("say \"hi\""), "'say \"hi\"'");
-        assert_eq!(quote("it's"), "\"it's\"");
-        // An escaped quote is not an unescaped one.
-        assert_eq!(quote("say \\\"hi\\\""), "\"say \\\"hi\\\"\"");
-        assert_eq!(quote("it's \"x\""), "\"it's \\\"x\\\"\"");
+    fn values_as_text() {
+        use ConfigValue::*;
+        assert_eq!(value_text(&Symbol("parsed".into())), "parsed");
+        assert_eq!(value_text(&Reference("claims/cl-1".into())), "@claims/cl-1");
+        assert_eq!(value_text(&List(vec![])), "[]");
+        assert_eq!(
+            value_text(&List(vec![
+                Symbol("a".into()),
+                String("b c".into()),
+                Integer(3)
+            ])),
+            "[a, \"b c\", 3]"
+        );
     }
 
     #[test]
@@ -165,9 +178,38 @@ mod tests {
             .unwrap();
         model.add_entity(root, "empty", None, None).unwrap();
         let expected = format!(
-            "a: x: 1, y: 2.0;\nb plural bs:\n    k:\n        long: \"{}\"\n    ;\n;\nempty:;\n",
+            "a: x: 1, y: 2.0;\nb plural bs:\n    k:\n        long: \"{}\",\n    ;\n;\nempty:;\n",
             "x".repeat(70)
         );
         assert_eq!(model.to_cola(), expected);
+    }
+
+    #[test]
+    fn long_lists_break_one_element_per_line() {
+        let items: Vec<ConfigValue> = (0..12)
+            .map(|i| ConfigValue::Symbol(format!("element-{i}")))
+            .collect();
+        let model = model_with(&[("tags", ConfigValue::List(items))]);
+        let text = model.to_cola();
+        assert!(
+            text.starts_with("a:\n    tags: [\n        element-0,\n"),
+            "{text}"
+        );
+        assert!(text.ends_with("        element-11,\n    ],\n;\n"), "{text}");
+    }
+
+    #[test]
+    fn multi_line_strings_become_blocks() {
+        let model = model_with(&[
+            ("gloss", ConfigValue::String("one\ntwo".into())),
+            ("n", ConfigValue::Integer(1)),
+        ]);
+        assert_eq!(
+            model.to_cola(),
+            "a:\n    gloss: \"\"\"\n        one\n        two\n    \"\"\",\n    n: 1,\n;\n"
+        );
+        // A string the block form cannot reproduce stays quoted.
+        let model = model_with(&[("odd", ConfigValue::String("has \"\"\" in\nit".into()))]);
+        assert_eq!(model.to_cola(), "a:\n    odd: 'has \"\"\" in\\nit',\n;\n");
     }
 }

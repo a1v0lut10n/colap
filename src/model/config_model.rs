@@ -29,17 +29,30 @@ pub enum ConfigValue {
     Integer(i64),
     Float(f64),
     Boolean(bool),
+    /// The decoded text.
     String(String),
+    /// A bare identifier in value position: `basis: parsed`.
+    Symbol(String),
+    /// `@path`, without the `@`: entity names from the root joined by `/`.
+    Reference(String),
+    /// `[…]` of scalars.
+    List(Vec<ConfigValue>),
 }
 
+impl ConfigValue {
+    /// Every scalar in the value: itself, or a list's elements.
+    pub fn scalars(&self) -> impl Iterator<Item = &ConfigValue> {
+        match self {
+            ConfigValue::List(items) => items.iter(),
+            scalar => std::slice::from_ref(scalar).iter(),
+        }
+    }
+}
+
+/// The canonical cola text of the value, on one line.
 impl fmt::Display for ConfigValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigValue::Integer(i) => write!(f, "{}", i),
-            ConfigValue::Float(fl) => write!(f, "{}", crate::model::canonical::float_text(*fl)),
-            ConfigValue::Boolean(b) => write!(f, "{}", b),
-            ConfigValue::String(s) => write!(f, "\"{}\"", s),
-        }
+        write!(f, "{}", crate::model::canonical::value_text(self))
     }
 }
 
@@ -186,6 +199,11 @@ pub enum ModelError {
         message: String,
         location: Option<SourceLocation>,
     },
+    /// A `@path` that names no entity in the model.
+    UnresolvedReference {
+        path: String,
+        location: Option<SourceLocation>,
+    },
 }
 
 impl ModelError {
@@ -193,7 +211,8 @@ impl ModelError {
     pub fn location(&self) -> Option<&SourceLocation> {
         match self {
             ModelError::Duplicate(d) => d.second.as_ref(),
-            ModelError::InvalidValue { location, .. } => location.as_ref(),
+            ModelError::InvalidValue { location, .. }
+            | ModelError::UnresolvedReference { location, .. } => location.as_ref(),
             ModelError::NoSuchNode(_) | ModelError::NoSuchPath(_) => None,
         }
     }
@@ -206,6 +225,9 @@ impl fmt::Display for ModelError {
             ModelError::NoSuchPath(path) => write!(f, "no entity at `{path}`"),
             ModelError::Duplicate(d) => write!(f, "{d}"),
             ModelError::InvalidValue { message, .. } => write!(f, "{message}"),
+            ModelError::UnresolvedReference { path, .. } => {
+                write!(f, "unresolved reference `@{path}`")
+            }
         }
     }
 }

@@ -1,0 +1,25 @@
+{{#if (eq element "String")}}
+items.iter().filter_map(|item| match item {
+                            colap::model::config_model::ConfigValue::String(s)
+                            | colap::model::config_model::ConfigValue::Symbol(s)
+                            | colap::model::config_model::ConfigValue::Reference(s) => Some(s.clone()),
+                            _ => None,
+                        }).collect()
+{{else if (eq element "i64")}}
+items.iter().filter_map(|item| match item {
+                            colap::model::config_model::ConfigValue::Integer(i) => Some(*i),
+                            _ => None,
+                        }).collect()
+{{else if (eq element "f64")}}
+items.iter().filter_map(|item| match item {
+                            colap::model::config_model::ConfigValue::Float(f) => Some(*f),
+                            _ => None,
+                        }).collect()
+{{else if (eq element "bool")}}
+items.iter().filter_map(|item| match item {
+                            colap::model::config_model::ConfigValue::Boolean(b) => Some(*b),
+                            _ => None,
+                        }).collect()
+{{else}}
+items.clone()
+{{/if}}

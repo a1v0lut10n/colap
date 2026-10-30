@@ -11,7 +11,7 @@ llm plural llms:
                 name: "gpt-4.1",
                 max_input_tokens: 1048576,
                 output_price: 8.0,
-                supports_vision: true
+                supports_vision: true,
             ;
         ;
     ;

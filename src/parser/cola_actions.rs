@@ -15,6 +15,10 @@ pub type Number = ValLoc<String>;
 pub fn number(_ctx: &Ctx, token: Token) -> Number {
     Number::new(token.value.into(), Some(_ctx.location()))
 }
+pub type Reference = ValLoc<String>;
+pub fn reference(_ctx: &Ctx, token: Token) -> Reference {
+    Reference::new(token.value.into(), Some(_ctx.location()))
+}
 pub type QuotedStringDouble = ValLoc<String>;
 pub fn quoted_string_double(_ctx: &Ctx, token: Token) -> QuotedStringDouble {
     QuotedStringDouble::new(token.value.into(), Some(_ctx.location()))
@@ -22,6 +26,10 @@ pub fn quoted_string_double(_ctx: &Ctx, token: Token) -> QuotedStringDouble {
 pub type QuotedStringSingle = ValLoc<String>;
 pub fn quoted_string_single(_ctx: &Ctx, token: Token) -> QuotedStringSingle {
     QuotedStringSingle::new(token.value.into(), Some(_ctx.location()))
+}
+pub type BlockString = ValLoc<String>;
+pub fn block_string(_ctx: &Ctx, token: Token) -> BlockString {
+    BlockString::new(token.value.into(), Some(_ctx.location()))
 }
 pub type Cola = Entity0;
 pub fn cola_entity0(_ctx: &Ctx, entity0: Entity0) -> Cola {
@@ -94,65 +102,39 @@ pub fn singular_entity_c1(
         Some(_ctx.location()),
     )
 }
-pub type EntityDefinition = NestedBlock0;
-pub fn entity_definition_nested_block0(
-    _ctx: &Ctx,
-    nested_block0: NestedBlock0,
-) -> EntityDefinition {
-    nested_block0
+pub type EntityDefinition = Item0;
+pub fn entity_definition_item0(_ctx: &Ctx, item0: Item0) -> EntityDefinition {
+    item0
 }
-pub type NestedBlock1 = Vec<NestedBlock>;
-pub fn nested_block1_c1(
-    _ctx: &Ctx,
-    mut nested_block1: NestedBlock1,
-    nested_block: NestedBlock,
-) -> NestedBlock1 {
-    nested_block1.push(nested_block);
-    nested_block1
+pub type Item1 = Vec<Item>;
+pub fn item1_c1(_ctx: &Ctx, mut item1: Item1, item: Item) -> Item1 {
+    item1.push(item);
+    item1
 }
-pub fn nested_block1_nested_block(_ctx: &Ctx, nested_block: NestedBlock) -> NestedBlock1 {
-    vec![nested_block]
+pub fn item1_item(_ctx: &Ctx, item: Item) -> Item1 {
+    vec![item]
 }
-pub type NestedBlock0 = Option<NestedBlock1>;
-pub fn nested_block0_nested_block1(_ctx: &Ctx, nested_block1: NestedBlock1) -> NestedBlock0 {
-    Some(nested_block1)
+pub type Item0 = Option<Item1>;
+pub fn item0_item1(_ctx: &Ctx, item1: Item1) -> Item0 {
+    Some(item1)
 }
-pub fn nested_block0_empty(_ctx: &Ctx) -> NestedBlock0 {
+pub fn item0_empty(_ctx: &Ctx) -> Item0 {
     None
 }
 #[derive(Debug, Clone)]
-pub enum NestedBlock {
-    FieldList(FieldList),
+pub enum Item {
+    Field1(Field),
+    Field2(Field),
     Entity(Box<Entity>),
 }
-pub fn nested_block_field_list(_ctx: &Ctx, field_list: FieldList) -> NestedBlock {
-    NestedBlock::FieldList(field_list)
+pub fn item_field1(_ctx: &Ctx, field: Field) -> Item {
+    Item::Field1(field)
 }
-pub fn nested_block_entity(_ctx: &Ctx, entity: Entity) -> NestedBlock {
-    NestedBlock::Entity(Box::new(entity))
+pub fn item_field2(_ctx: &Ctx, field: Field) -> Item {
+    Item::Field2(field)
 }
-#[derive(Debug, Clone)]
-pub struct FieldListC2Base {
-    pub field_list: Box<FieldList>,
-    pub field: Field,
-}
-pub type FieldListC2 = ValLoc<FieldListC2Base>;
-#[derive(Debug, Clone)]
-pub enum FieldList {
-    Field(Field),
-    C2(FieldListC2),
-}
-pub fn field_list_field(_ctx: &Ctx, field: Field) -> FieldList {
-    FieldList::Field(field)
-}
-pub fn field_list_c2(_ctx: &Ctx, field_list: FieldList, field: Field) -> FieldList {
-    FieldList::C2(FieldListC2::new(
-        FieldListC2Base {
-            field_list: Box::new(field_list),
-            field,
-        },
-        Some(_ctx.location()),
-    ))
+pub fn item_entity(_ctx: &Ctx, entity: Entity) -> Item {
+    Item::Entity(Box::new(entity))
 }
 #[derive(Debug, Clone)]
 pub struct FieldBase {
@@ -171,30 +153,73 @@ pub fn field_c1(_ctx: &Ctx, identifier: Identifier, field_value: FieldValue) -> 
 }
 #[derive(Debug, Clone)]
 pub enum FieldValue {
+    Scalar(Scalar),
+    List(List),
+}
+pub fn field_value_scalar(_ctx: &Ctx, scalar: Scalar) -> FieldValue {
+    FieldValue::Scalar(scalar)
+}
+pub fn field_value_list(_ctx: &Ctx, list: List) -> FieldValue {
+    FieldValue::List(list)
+}
+#[derive(Debug, Clone)]
+pub enum Scalar {
     QuotedStringDouble(QuotedStringDouble),
     QuotedStringSingle(QuotedStringSingle),
+    BlockString(BlockString),
     Number(Number),
     BooleanTrue,
     BooleanFalse,
+    Reference(Reference),
+    Identifier(Identifier),
 }
-pub fn field_value_quoted_string_double(
-    _ctx: &Ctx,
-    quoted_string_double: QuotedStringDouble,
-) -> FieldValue {
-    FieldValue::QuotedStringDouble(quoted_string_double)
+pub fn scalar_quoted_string_double(_ctx: &Ctx, quoted_string_double: QuotedStringDouble) -> Scalar {
+    Scalar::QuotedStringDouble(quoted_string_double)
 }
-pub fn field_value_quoted_string_single(
-    _ctx: &Ctx,
-    quoted_string_single: QuotedStringSingle,
-) -> FieldValue {
-    FieldValue::QuotedStringSingle(quoted_string_single)
+pub fn scalar_quoted_string_single(_ctx: &Ctx, quoted_string_single: QuotedStringSingle) -> Scalar {
+    Scalar::QuotedStringSingle(quoted_string_single)
 }
-pub fn field_value_number(_ctx: &Ctx, number: Number) -> FieldValue {
-    FieldValue::Number(number)
+pub fn scalar_block_string(_ctx: &Ctx, block_string: BlockString) -> Scalar {
+    Scalar::BlockString(block_string)
 }
-pub fn field_value_boolean_true(_ctx: &Ctx) -> FieldValue {
-    FieldValue::BooleanTrue
+pub fn scalar_number(_ctx: &Ctx, number: Number) -> Scalar {
+    Scalar::Number(number)
 }
-pub fn field_value_boolean_false(_ctx: &Ctx) -> FieldValue {
-    FieldValue::BooleanFalse
+pub fn scalar_boolean_true(_ctx: &Ctx) -> Scalar {
+    Scalar::BooleanTrue
+}
+pub fn scalar_boolean_false(_ctx: &Ctx) -> Scalar {
+    Scalar::BooleanFalse
+}
+pub fn scalar_reference(_ctx: &Ctx, reference: Reference) -> Scalar {
+    Scalar::Reference(reference)
+}
+pub fn scalar_identifier(_ctx: &Ctx, identifier: Identifier) -> Scalar {
+    Scalar::Identifier(identifier)
+}
+#[derive(Debug, Clone)]
+pub enum List {
+    Scalar0(Scalar0),
+    Scalar1(Scalar1),
+}
+pub fn list_scalar0(_ctx: &Ctx, scalar0: Scalar0) -> List {
+    List::Scalar0(scalar0)
+}
+pub fn list_scalar1(_ctx: &Ctx, scalar1: Scalar1) -> List {
+    List::Scalar1(scalar1)
+}
+pub type Scalar1 = Vec<Scalar>;
+pub fn scalar1_c1(_ctx: &Ctx, mut scalar1: Scalar1, scalar: Scalar) -> Scalar1 {
+    scalar1.push(scalar);
+    scalar1
+}
+pub fn scalar1_scalar(_ctx: &Ctx, scalar: Scalar) -> Scalar1 {
+    vec![scalar]
+}
+pub type Scalar0 = Option<Scalar1>;
+pub fn scalar0_scalar1(_ctx: &Ctx, scalar1: Scalar1) -> Scalar0 {
+    Some(scalar1)
+}
+pub fn scalar0_empty(_ctx: &Ctx) -> Scalar0 {
+    None
 }

@@ -47,7 +47,7 @@ fn check_reports_every_error_and_exits_1() {
         stdout(&out),
         format!(
             "{path}:6:5: error: duplicate field `x` in `a`; first at 5:5\n\
-             {path}:12:8: error: Expected one of BooleanFalse, BooleanTrue, Semicolon, Identifier, Number, QuotedStringDouble, QuotedStringSingle.\n\
+             {path}:12:8: error: Expected one of BooleanFalse, BooleanTrue, LBracket, Semicolon, Identifier, Number, Reference, QuotedStringDouble, QuotedStringSingle, BlockString.\n\
              {path}:21:5: error: duplicate entry `cl-1` in `claim`; first at 18:5\n"
         )
     );
