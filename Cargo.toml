@@ -1,6 +1,6 @@
 [package]
 name = "colap"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Hans Van Wesenbeeck <hvw@aivolution.ch>"]
 license = "Apache-2.0"
 edition = "2024"
@@ -10,6 +10,10 @@ repository = "https://github.com/a1v0lut10n/colap.git"
 homepage = "https://github.com/a1v0lut10n/colap"
 keywords = ["configuration", "parser", "code-generator", "cola", "language"]
 categories = ["config", "command-line-utilities", "development-tools", "parsing", "parser-implementations"]
+# The published crate carries the code, the tests, the bench and the
+# README's images; the workspace conventions and the design history
+# stay in the repository.
+exclude = ["docs/", ".claude/", "CLAUDE.md", ".github/", ".pre-commit-config.yaml", "scripts/"]
 
 [dependencies]
 rustemo = "0.7.1"

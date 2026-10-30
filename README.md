@@ -534,4 +534,9 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 
 Copyright 2025-2026 Hans Van Wesenbeeck (hvw@aivolution.ch)
 
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in this work by you shall be licensed under the
+Apache License 2.0, without any additional terms or conditions (Section 5
+of the license).
+
 ---
