@@ -19,7 +19,7 @@ specified in `docs/spec/cola.md`, whose terms this document uses.
 
 The design record is `docs/design/2026-10-31-schema-dialect.md`; the
 corpus under `tests/conformance/schema/` holds the validator to this
-document (section 7).
+document (section 8).
 
 ## 1. A schema is a cola document
 
@@ -229,7 +229,41 @@ an ordinary finding, before any document is checked. The meta-schema
 validates itself; it is the one place `like` is needed by the
 dialect, since a declaration contains declarations.
 
-## 7. The conformance corpus
+## 7. Generated code
+
+`colap generate --schema S.md [FILE]` emits Rust types from the
+declarations rather than from a sample's literals. One struct per
+shape, named after its declaration in PascalCase (prefixed with its
+parent's name when two would collide); a collection wrapper per plural
+declaration, named after the plural name, with lookup by key and
+iteration in source order; a `Root` for the root shape; a `like`
+declaration has its target's type, so a tree is `Folder` holding
+`Folders` of `Folder`.
+
+| Declaration | Rust |
+|---|---|
+| `string`, `symbol`, `reference`, `instant`, `date`, `datetime`, `edtf` | `String` |
+| `integer` | `i64` |
+| `float`, `number` | `f64` |
+| `decimal` | `colap::config_model::Number`, the exact value |
+| `boolean` | `bool` |
+| `any` | `Option<colap::config_model::ConfigValue>`, always optional |
+| `symbol` with `one_of` | an enum named after the struct and the field, `LlmBasis { Mirrored, Parsed, Derived }`, with `as_str`, `FromStr` and the first symbol as default |
+| `list: true` | `Vec<T>` of the above |
+| a field not `required` | `Option<T>` |
+| a child entity not `required` | `Option<Struct>`; a collection is always its wrapper, possibly empty |
+| `doc` | a doc comment |
+
+The generated code embeds the schema's text as `SCHEMA` and `Root`
+offers `load(path)`, which reads the file, validates it against the
+embedded schema and builds the root, or returns every error; and
+`from_model(&model)` for a model the caller has already checked, where
+a value the schema would reject is left at its default. The generated
+crate depends on the published colap, or on a checkout given with
+`--colap-path`; a document given with the schema is validated first,
+copied into the crate's tests and loaded by its integration test.
+
+## 8. The conformance corpus
 
 `tests/conformance/schema/` holds schemas and documents in pairs:
 `NAME.schema.md` is a schema, every `NAME-*.md` beside it a document
@@ -239,4 +273,5 @@ must produce, one per line in the textual form of section 5, with
 `<path>` standing for the file's path; no sidecar means no findings.
 The test runner (`tests/conformance.rs`) checks every pair, checks
 that the meta-schema validates itself, and checks that this document
-is clean.
+is clean. `tests/generate_schema.rs` builds a crate generated from the
+registry schema against the checkout and runs its tests.

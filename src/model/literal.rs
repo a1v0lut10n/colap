@@ -239,6 +239,13 @@ impl Number {
     }
 }
 
+/// Zero.
+impl Default for Number {
+    fn default() -> Self {
+        Number { text: "0".into() }
+    }
+}
+
 impl PartialEq for Number {
     fn eq(&self, other: &Self) -> bool {
         self.normal() == other.normal()

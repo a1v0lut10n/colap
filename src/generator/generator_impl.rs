@@ -35,6 +35,8 @@ pub struct CodeGenerator {
     plural_instances: HashSet<usize>,
     // Handlebars registry for template rendering
     handlebars: Handlebars<'static>,
+    /// The `colap = …` line of the generated `Cargo.toml`.
+    colap_dependency: String,
 }
 
 impl CodeGenerator {
@@ -81,7 +83,20 @@ impl CodeGenerator {
             emitted_structs: HashSet::new(),
             plural_instances: HashSet::new(),
             handlebars,
+            colap_dependency: format!("\"{}\"", env!("CARGO_PKG_VERSION")),
         })
+    }
+
+    /// Depend on a colap checkout by path instead of the published
+    /// version, for local builds of the generated crate.
+    pub fn with_colap_path(mut self, path: &Path) -> Self {
+        self.colap_dependency = format!(
+            "{{ path = \"{}\" }}",
+            path.to_string_lossy()
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+        );
+        self
     }
 
     /// Entry point – generate code based on the configured mode.
@@ -219,14 +234,9 @@ impl CodeGenerator {
 
     /// Generate Cargo.toml for the crate
     fn generate_cargo_toml(&self, output_dir: &Path, crate_name: &str) -> Result<()> {
-        // Figure out the relative path to colap crate from the output directory
-        // This is a simplified approach; in a real-world scenario, you might need a more robust solution
-        let colap_path = "../colap".to_string();
-
-        // Create the template data
         let cargo_data = json!({
             "crate_name": crate_name,
-            "colap_path": colap_path,
+            "colap_dependency": self.colap_dependency,
         });
 
         // Render the Cargo.toml using the Handlebars template

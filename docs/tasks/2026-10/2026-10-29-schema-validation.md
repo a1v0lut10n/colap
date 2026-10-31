@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: in-progress
+status: done
 affects:
   - README.md
 tags: [schema, validation, language-design]
@@ -70,7 +70,10 @@ Decided in `docs/design/2026-10-31-schema-dialect.md` (accepted
 2026-10-31), with numbers made exact first (COLA-0010). COLA-0011 built
 deliverables 1, 2 and 4: the dialect, `colap check --schema`, the
 meta-schema, the spec `docs/spec/schema.md` and the schema corpus.
-Deliverable 3, the generator's `--schema`, is the next ticket.
+Deliverable 3, the generator's `--schema`, followed in COLA-0012
+(`docs/implementation/2026-10/2026-10-31-cola-0012-generate-schema.md`).
+README.md documents schemas and generation; the journal entries of
+2026-10-31 link back here.
 
 ## Completion
 

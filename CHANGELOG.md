@@ -22,8 +22,15 @@ All notable changes to colap. The format follows
   `Report::findings`. The meta-schema (`colap::schema::META`) checks
   every schema first and validates itself. `regex` is a direct
   dependency.
-- `ConfigValue` is `PartialEq` and `Eq`; `Diagnostic::at` builds a
-  finding at a location.
+- **`colap generate --schema S.md [INPUT]`** types from declarations:
+  one struct per declaration, enums for `symbol` fields with `one_of`,
+  `Option` for what is not required, `Vec` for lists, `Number` for
+  `decimal`; the generated code embeds the schema and `Root::load`
+  validates a file before building it. `--colap-path <DIR>` makes a
+  generated crate depend on a checkout; without it the crate depends
+  on the published colap instead of the old `../colap` path.
+- `ConfigValue` is `PartialEq` and `Eq`; `Number` is `Default` (zero);
+  `Diagnostic::at` builds a finding at a location.
 
 - **Comments.** `//` to the end of the line inside cola blocks, layout to
   the grammar and never a value. The model keeps them (`Comments` on

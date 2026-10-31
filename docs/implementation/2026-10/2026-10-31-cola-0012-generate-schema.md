@@ -2,9 +2,10 @@
 date: 2026-10-31
 type: task
 ticket: COLA-0012
-status: in-progress
+status: done
 affects:
   - src/generator/generator_impl.rs
+  - src/generator/schema_gen.rs
   - src/generator/mod.rs
   - src/generator/templates/cargo_toml.hbs
   - src/main.rs
@@ -92,11 +93,33 @@ generator reads.
    table; the record's `decimal` line; README generation section;
    CHANGELOG `Unreleased`; the schema task set done; journal.
 
+## What was built
+
+As planned. Settled on the way:
+
+- `any` is always `Option<ConfigValue>`, required or not:
+  `ConfigValue` has no default, and inventing one would read as a
+  value.
+- The collection wrapper got its own template, a copy of the
+  inference path's with `PartialEq`, so that generated structs can
+  derive it; the inference path's structs do not, and a shared
+  template would have broken them.
+- Readers are closures written by the generator and placed by the
+  template (`({{read}})(value)`), so the struct template has one arm
+  per field shape instead of one per type.
+- The generated test for a module mode goes in the module file as
+  `mod tests`; without a document no test is generated.
+- Enum variants are the symbols in PascalCase (`gRPC` is `GRpc`),
+  numbered or prefixed when that collides; `as_str` keeps the symbol.
+
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] The generated registry crate builds and its tests pass through
-      `Root::load`, which rejects `registry-findings.md` with the
-      validator's findings.
-- [ ] A generated module from the tree schema compiles the recursion.
-- [ ] `cargo bench --bench scale` does not move.
+- [x] The three Rust gates are clean.
+- [x] `tests/generate_schema.rs` generates the registry crate against
+      this checkout, builds it and runs its tests: typed values,
+      enums, `Option`s, `Number`, and `Root::load` rejecting
+      `registry-findings.md` with the validator's findings.
+- [x] A module generated from the tree schema names `Folder` once and
+      compiled with its recursion (verified by hand; the test asserts
+      the text).
+- [x] `cargo bench --bench scale` does not move.

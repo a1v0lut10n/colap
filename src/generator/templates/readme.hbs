@@ -7,6 +7,10 @@ Auto-generated configuration parser crate for {{config_filename}}.
 ```rust
 use {{crate_name}}::Root;
 
+{{#if from_schema}}
+// Read a file, validate it against the embedded schema, build the root.
+let config = Root::load("path/to/config.md").expect("a document matching the schema");
+{{else}}
 // Parse a configuration file: markdown with ```cola fences, or bare cola.
 fn parse_config() -> Root {
     let parsed = colap::parse_file("path/to/config.md").expect("Failed to parse configuration");
@@ -15,6 +19,7 @@ fn parse_config() -> Root {
 
 // Access configuration values
 let config = parse_config();
+{{/if}}
 {{#if example_code}}
 {{example_code}}
 {{/if}}

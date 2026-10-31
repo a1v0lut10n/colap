@@ -1,0 +1,102 @@
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct {{struct_name}} {
+{{#each fields}}
+{{#if doc}}
+    /// {{doc}}
+{{/if}}
+    pub {{name}}: {{rust_type}},
+{{/each}}
+{{#each children}}
+{{#if doc}}
+    /// {{doc}}
+{{/if}}
+    pub {{name}}: {{rust_type}},
+{{/each}}
+}
+
+impl {{struct_name}} {
+{{#if is_root}}
+    /// The root of a model the caller has already checked.
+    pub fn from_model(model: &colap::ConfigModel) -> Self {
+        Self::from_entity(model, model.root_id())
+    }
+
+    /// Read a file, validate it against [`SCHEMA`] and build the root,
+    /// or every error found.
+    pub fn load(path: impl AsRef<std::path::Path>) -> Result<Self, Vec<colap::Diagnostic>> {
+        let schema = colap::check_str(SCHEMA, None)
+            .outcome
+            .ok()
+            .and_then(|model| colap::load_schema(&model, None).schema);
+        let mut report = colap::check_file(path.as_ref());
+        match &schema {
+            Some(schema) => report.validate(schema),
+            None => {
+                return Err(vec![colap::Diagnostic::at(
+                    colap::diagnostic::Severity::Error,
+                    None,
+                    None,
+                    "the embedded schema does not load; regenerate this code".into(),
+                )]);
+            }
+        }
+        if !report.is_clean() {
+            return Err(report
+                .diagnostics()
+                .into_iter()
+                .filter(|d| d.severity == colap::diagnostic::Severity::Error)
+                .collect());
+        }
+        match report.outcome {
+            Ok(model) => Ok(Self::from_model(&model)),
+            Err(error) => Err(colap::Diagnostic::from_error(&error)),
+        }
+    }
+
+{{/if}}
+    /// The entity `id` of a model the caller has already checked. A
+    /// value the schema would reject is left at its default.
+    pub fn from_entity(model: &colap::ConfigModel, id: usize) -> Self {
+{{#if fields}}
+        let mut result = Self::default();
+{{else}}{{#if children}}
+        let mut result = Self::default();
+{{else}}
+        let _ = (model, id);
+        let result = Self::default();
+{{/if}}{{/if}}
+{{#if fields}}
+        if let Some(node) = model.get_node(id) {
+            let node = node.borrow();
+{{#each fields}}
+            if let Some(value) = node.field_value("{{original}}") {
+{{#if list}}
+                if let colap::config_model::ConfigValue::List(items) = value {
+                    let items: {{inner}} = items.iter().filter_map({{read}}).collect();
+                    result.{{name}} = {{#if required}}items{{else}}Some(items){{/if}};
+                }
+{{else}}
+                if let Some(v) = ({{read}})(value) {
+                    result.{{name}} = {{#if required}}v{{else}}Some(v){{/if}};
+                }
+{{/if}}
+            }
+{{/each}}
+        }
+{{/if}}
+{{#each children}}
+{{#if plural}}
+        result.{{name}} = model
+            .find_child_entity_by_name(id, "{{original}}")
+            .map(|child| {{wrapper}}::from_children(model, child))
+            .unwrap_or_default();
+{{else}}
+        result.{{name}} = model
+            .find_child_entity_by_name(id, "{{original}}")
+            .map(|child| {{struct}}::from_entity(model, child)){{#if required}}
+            .unwrap_or_default(){{/if}};
+{{/if}}
+{{/each}}
+        result
+    }
+}
