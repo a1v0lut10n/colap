@@ -811,8 +811,8 @@ impl CodeGenerator {
 /// `ConfigValue` itself.
 fn rust_type(value: &ConfigValue) -> (String, Option<String>) {
     let scalar = |value: &ConfigValue| match value {
-        ConfigValue::Integer(_) => "i64",
-        ConfigValue::Float(_) => "f64",
+        ConfigValue::Number(n) if n.is_integer() => "i64",
+        ConfigValue::Number(_) => "f64",
         ConfigValue::Boolean(_) => "bool",
         ConfigValue::String(_) | ConfigValue::Symbol(_) | ConfigValue::Reference(_) => "String",
         ConfigValue::List(_) => "colap::model::config_model::ConfigValue",

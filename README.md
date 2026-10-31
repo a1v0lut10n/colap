@@ -138,7 +138,8 @@ model plural models:
   the original file
 - Reports errors as `path:line:col: message`
 - Values: strings with escapes and `"""` block strings, numbers with digit
-  separators and exponents, booleans, bare symbols (`basis: parsed`), lists
+  separators and exponents kept exactly as written (no size limit, no
+  rounding; machine types are the reader's choice), booleans, bare symbols (`basis: parsed`), lists
   (`tags: [a, "b", 3]`) and references (`@claims/cl-1`) that `colap check`
   resolves
 - `//` comments inside cola blocks, kept in the model and written back in
@@ -370,8 +371,8 @@ The generator maps Cola types to Rust types as follows:
 | Cola Type | Rust Type |
 |-----------|----------|
 | String, Symbol, Reference | `String` |
-| Integer | `i64` |
-| Float | `f64` |
+| Number of integer kind (`8`) | `i64`, when the value fits |
+| Number of float kind (`8.0`, `1e3`) | `f64`, the nearest double |
 | Boolean | `bool` |
 | List | `Vec<T>` of the elements' type, `Vec<ConfigValue>` when empty or mixed |
 | Entity | Custom struct |

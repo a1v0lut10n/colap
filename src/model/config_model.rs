@@ -20,14 +20,16 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
+pub use crate::model::literal::Number;
+
 pub type NodeId = usize;
 pub type NodeRef = Rc<RefCell<EntityNode>>;
 
 /// Represents the different types of values a configuration field can have
 #[derive(Debug, Clone)]
 pub enum ConfigValue {
-    Integer(i64),
-    Float(f64),
+    /// An exact decimal, as written; see [`Number`].
+    Number(Number),
     Boolean(bool),
     /// The decoded text.
     String(String),
@@ -661,7 +663,7 @@ mod tests {
             )
             .unwrap();
         model
-            .add_field_to_entity(openai_id, "max_tokens", ConfigValue::Integer(1000))
+            .add_field_to_entity(openai_id, "max_tokens", ConfigValue::Number(1000.into()))
             .unwrap();
 
         // Create 'model plural models' under 'openai'
@@ -676,7 +678,11 @@ mod tests {
 
         // Add fields to gpt-4
         model
-            .add_field_to_entity(gpt4_id, "max_input_tokens", ConfigValue::Integer(8192))
+            .add_field_to_entity(
+                gpt4_id,
+                "max_input_tokens",
+                ConfigValue::Number(8192.into()),
+            )
             .unwrap();
         model
             .add_field_to_entity(gpt4_id, "supports_vision", ConfigValue::Boolean(true))
@@ -687,10 +693,11 @@ mod tests {
 
         // Test retrieving values
         let max_tokens = model.get_field_value(openai_id, "max_tokens").unwrap();
-        if let ConfigValue::Integer(val) = max_tokens {
+        if let ConfigValue::Number(val) = max_tokens {
+            let val = val.as_i64().expect("fits");
             assert_eq!(val, 1000);
         } else {
-            panic!("Expected Integer value for max_tokens");
+            panic!("Expected a number for max_tokens");
         }
 
         // Test finding entity by path, by singular and by plural name
@@ -741,7 +748,7 @@ mod tests {
         let root = model.root_id();
         let llm = model.add_entity(root, "llm", None, None).unwrap();
         model
-            .add_field_to_entity(llm, "api", ConfigValue::Integer(1))
+            .add_field_to_entity(llm, "api", ConfigValue::Number(1.into()))
             .unwrap();
         let err = model.add_entity(llm, "api", None, None).unwrap_err();
         assert_eq!(
@@ -749,12 +756,12 @@ mod tests {
             "`api` in `llm` is already a field and cannot also be an entity"
         );
         let err = model
-            .add_field_to_entity(llm, "api", ConfigValue::Integer(2))
+            .add_field_to_entity(llm, "api", ConfigValue::Number(2.into()))
             .unwrap_err();
         assert_eq!(err.to_string(), "duplicate field `api` in `llm`");
 
         model
-            .add_field_to_entity(llm, "models", ConfigValue::Integer(3))
+            .add_field_to_entity(llm, "models", ConfigValue::Number(3.into()))
             .unwrap();
         let err = model
             .add_entity(llm, "model", Some("models"), None)

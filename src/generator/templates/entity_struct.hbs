@@ -38,12 +38,15 @@ impl {{struct_name}} {
                         result.{{name}} = s.clone();
                     }
                     {{else if (eq type "i64")}}
-                    if let {{@root.model_import}}::ConfigValue::Integer(i) = val {
-                        result.{{name}} = *i;
+                    if let {{@root.model_import}}::ConfigValue::Number(n) = val {
+                        // The generated crate is edition 2021: no let chains.
+                        if let Some(i) = n.as_i64() {
+                            result.{{name}} = i;
+                        }
                     }
                     {{else if (eq type "f64")}}
-                    if let {{@root.model_import}}::ConfigValue::Float(f) = val {
-                        result.{{name}} = *f;
+                    if let {{@root.model_import}}::ConfigValue::Number(n) = val {
+                        result.{{name}} = n.as_f64();
                     }
                     {{else if (eq type "bool")}}
                     if let {{@root.model_import}}::ConfigValue::Boolean(b) = val {

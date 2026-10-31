@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The value language: what each literal form becomes in the model,
 //! per `docs/design/2026-10-30-value-language.md`.
-use colap::config_model::{ConfigModel, ConfigValue};
+use colap::config_model::{ConfigModel, ConfigValue, Number};
 
 fn model(name: &str) -> ConfigModel {
     colap::parse_file(format!("tests/conformance/valid/{name}"))
@@ -41,13 +41,44 @@ fn numbers_take_separators_and_exponents() {
     let m = model("values.md");
     assert_eq!(text(&m, "sample", "grouped"), "1000000");
     assert_eq!(text(&m, "sample", "padded"), "7");
-    assert_eq!(text(&m, "sample", "exponent"), "0.0015");
-    assert_eq!(text(&m, "sample", "big"), "20000000000.0");
-    assert!(matches!(value(&m, "sample", "big"), ConfigValue::Float(_)));
-    assert!(matches!(
-        value(&m, "sample", "grouped"),
-        ConfigValue::Integer(_)
-    ));
+    assert_eq!(text(&m, "sample", "exponent"), "1.5e-3");
+    assert_eq!(text(&m, "sample", "big"), "2e10");
+    assert_eq!(text(&m, "sample", "float"), "1.50");
+    let number = |field: &str| match value(&m, "sample", field) {
+        ConfigValue::Number(n) => n,
+        other => panic!("{field} is {other:?}"),
+    };
+    assert!(!number("big").is_integer() && number("grouped").is_integer());
+    assert_eq!(number("big").as_i64(), Some(20_000_000_000));
+    assert_eq!(number("exponent").as_f64(), 0.0015);
+    assert_eq!(number("float"), Number::from(1.5));
+}
+
+#[test]
+fn numbers_of_any_size_survive_exactly() {
+    let m = model("big-numbers.md");
+    let number = |field: &str| match value(&m, "limits", field) {
+        ConfigValue::Number(n) => n,
+        other => panic!("{field} is {other:?}"),
+    };
+    assert_eq!(number("max").text(), "99999999999999999999");
+    assert_eq!(number("max").as_i64(), None);
+    assert_eq!(
+        number("max").decimal(),
+        (false, "99999999999999999999".into(), 0)
+    );
+    assert_eq!(number("precise").text(), "0.30000000000000004441");
+    assert_eq!(number("precise").as_f64(), 0.30000000000000004);
+    assert_eq!(number("wide").text(), "123456789012345678901234567890");
+    // Formatting keeps every digit, bar the separators.
+    let formatted = colap::format::format_file("tests/conformance/valid/big-numbers.md").unwrap();
+    assert!(
+        formatted
+            .text
+            .contains("wide: 123456789012345678901234567890,")
+    );
+    assert!(formatted.text.contains("trailing: 1.10,"));
+    assert!(formatted.text.contains("scaled: 2e10,"));
 }
 
 #[test]

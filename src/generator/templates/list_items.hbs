@@ -7,12 +7,12 @@ items.iter().filter_map(|item| match item {
                         }).collect()
 {{else if (eq element "i64")}}
 items.iter().filter_map(|item| match item {
-                            colap::model::config_model::ConfigValue::Integer(i) => Some(*i),
+                            colap::model::config_model::ConfigValue::Number(n) => n.as_i64(),
                             _ => None,
                         }).collect()
 {{else if (eq element "f64")}}
 items.iter().filter_map(|item| match item {
-                            colap::model::config_model::ConfigValue::Float(f) => Some(*f),
+                            colap::model::config_model::ConfigValue::Number(n) => Some(n.as_f64()),
                             _ => None,
                         }).collect()
 {{else if (eq element "bool")}}
