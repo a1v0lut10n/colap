@@ -29,7 +29,13 @@ Scalar: QuotedStringDouble | QuotedStringSingle | BlockString | Number
 
 List: LBracket Scalar*[Comma] RBracket | LBracket Scalar+[Comma] Comma RBracket;
 
-// Special rule always applied to each token.
+// Layout is skipped between any two tokens: whitespace, and `//`
+// comments to the end of the line, lexed as one terminal because the
+// layout parser runs between every two tokens and a single regex is
+// the cheapest it gets. A `//` inside a string is text, since the
+// string terminal is matched first. Comments reach the model by a
+// second pass over the block text (`ModelBuilder::add_block`), not
+// through this grammar.
 Layout: WS+ | EMPTY;
 
 terminals
@@ -47,5 +53,5 @@ terminals
 	QuotedStringSingle: /'([^'\\]|\\.)*'/;
 	BlockString: /"""(?s:.*?)"""/;
 	Semicolon: ';';
-	// Terminal for whitespace used by the Layout rule
-	WS: /\s+/;
+	// Whitespace and comments, for the Layout rule only
+	WS: /(\s+|\/\/[^\n]*)+/;

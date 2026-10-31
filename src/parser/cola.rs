@@ -1836,7 +1836,9 @@ pub(crate) static RECOGNIZERS: [TokenRecognizer; TERMINAL_COUNT] = [
     TokenRecognizer(TokenKind::Semicolon, Recognizer::StrMatch(";")),
     TokenRecognizer(
         TokenKind::WS,
-        Recognizer::RegexMatch(Lazy::new(|| Regex::new(concat!("^", "\\s+")).unwrap())),
+        Recognizer::RegexMatch(Lazy::new(|| {
+            Regex::new(concat!("^", "(\\s+|//[^\\n]*)+")).unwrap()
+        })),
     ),
 ];
 pub struct DefaultBuilder {

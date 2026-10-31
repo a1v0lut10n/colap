@@ -117,10 +117,14 @@ insignificant except as a separator. Indentation carries no meaning.
   is a symbol there, since it is a keyword only where a keyword can stand.
 - **Reference**: `@` followed by identifiers joined by `/`:
   `@claims/cl-1`. Section 5.5 says what it must name.
-- There are no comments.
+- **Comment**: `//` to the end of the line. A comment is layout, like
+  whitespace: it may stand wherever whitespace may, is never a value,
+  and `//` inside a string is text. Prose outside a block is not a
+  comment; it is prose. Section 5.6 says where a comment belongs.
 
 ```cola
-lexical:
+// A comment on its own line.
+lexical: // and one after the header
     name: 'single-quoted',
     quoted: "say \"hi\"",
     gloss: """
@@ -134,6 +138,7 @@ lexical:
     on: true,
     basis: parsed,
     see: @lexical,
+    url: "http://example.org", // the `//` in the string is text
     tags: [alpha, "two words", 3]
 ;
 ```
@@ -255,6 +260,32 @@ document, in a list or not, must resolve in the finished model; one that
 does not is an error at its field. A reference may point forward, and
 into another block of the same document.
 
+### 5.6 Comments
+
+The model keeps every comment, attached to an item by position, so that
+a formatter can write it back where it was. A comment on the line where
+a field, an entity header or an entity's `;` ends is that item's
+**trailing** comment; when several items end on that line, the last one
+takes it. Any other comment is a **leading** comment of the next field
+or entity among the direct items of the innermost entity around it;
+when no item follows, it leads that entity's `;`; a comment after the
+last entity of a block, or in a block with none, belongs to the end of
+the block. A comment on a line inside a multi-line list, neither on the
+list's last line nor before the field, is a leading comment of the
+field. The text is kept as written after `//`, trailing whitespace
+trimmed.
+
+```cola
+// leads `comment`
+comment: // trails the header
+    a: 1, // trails `a`
+    // leads `b`
+    b: 2,
+    // leads the `;`
+; // trails the `;`
+// ends the block
+```
+
 ## 6. Diagnostics
 
 A reader reports **every** finding in a document, not only the first: a
@@ -313,7 +344,14 @@ pure function of the model:
   at the field's indentation, when that form reads back as the same
   value; any other string is on one line, double-quoted with `\\`, `\"`,
   `\n`, `\r`, `\t` and control characters escaped, except that a string
-  containing `"` and no `'` is single-quoted.
+  containing `"` and no `'` is single-quoted;
+- a leading comment stands on its own line at its item's indentation, a
+  trailing comment follows the item on its line, after the field's `,`,
+  the header's `:` or the `;`, one space away, as `//` and the text as
+  kept; an entity whose header or fields carry a comment, or that has
+  a comment before its `;`, is never written on one line, while a
+  comment after the `;` is written after the one-line form; the
+  comments at the end of a block follow its last entity.
 
 Formatting a literate document rewrites only the bodies of its cola
 fences, each block on its own; prose and foreign fences are untouched, and
@@ -331,6 +369,8 @@ canonical:
             of prose.
         """,
     ;
+    // leads `noted`
+    noted: a: 1; // trails the one-line form
 ;
 ```
 
@@ -348,14 +388,9 @@ The following are not part of the language as specified. Each has a task
 and will be decided in a design record; this document is updated when a
 decision is accepted.
 
-- **Comments**: `//` to the end of the line inside cola blocks, carried
-  through the canonical layout; accepted in
-  `docs/design/2026-10-30-value-language.md` and not yet implemented.
 - **Schemas**: declaring the shape a document must have, and checking
   against it (`docs/tasks/2026-10/2026-10-29-schema-validation.md`).
   Typed date and instant literals and null values are deferred to it.
-
-Until then: there are no comments.
 
 ## 10. The conformance corpus
 
@@ -368,5 +403,5 @@ every reproduction from the 2026-10-29 field test.
 
 The test runner (`tests/conformance.rs`) checks every file against its
 sidecar, checks that this document is clean, and checks that the editor
-highlighter's identifier, number and string tokens on every cola line are
-exactly the parser's located terminals.
+highlighter's identifier, symbol, reference, number and string tokens on
+every cola line are exactly the parser's located terminals.

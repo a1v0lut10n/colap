@@ -4,6 +4,23 @@ All notable changes to colap. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Comments.** `//` to the end of the line inside cola blocks, layout to
+  the grammar and never a value. The model keeps them (`Comments` on
+  every `ConfigField`, and `comments` and `closing` on every
+  `EntityNode`; the root's `closing.leading` holds a block's end
+  comments) and `colap fmt` writes them back in place; the highlighter
+  has `TokenKind::Comment`. Spec sections 3, 5.6 and 7.
+
+### Breaking
+
+- `ModelBuilder::add_block` takes the block text as well as the AST:
+  `add_block(&ast, body, line_offset)`. `ConfigField` and `EntityNode`
+  gained public fields, and `TokenKind` a variant.
+
 ## [0.3.0] — 2026-10-30
 
 The field test of 0.2 in a literate knowledge repository drove this
@@ -97,5 +114,6 @@ except for string escapes, which are now decoded.
 The release the field test ran against: the markdown-aware grammar, the
 code generator, and the editor highlighter.
 
+[Unreleased]: https://github.com/a1v0lut10n/colap/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/a1v0lut10n/colap/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/a1v0lut10n/colap/releases/tag/v0.2.0

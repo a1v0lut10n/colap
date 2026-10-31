@@ -36,7 +36,7 @@ fn canonical_body(body: &str, path: Option<&Path>, line_offset: u32) -> Result<S
         .parse(body)
         .map_err(|e| Error::from_rustemo(e, path, line_offset))?;
     let mut builder = ModelBuilder::new(path);
-    builder.add_block(&ast, line_offset);
+    builder.add_block(&ast, body, line_offset);
     Ok(builder.finish_block()?.to_cola())
 }
 

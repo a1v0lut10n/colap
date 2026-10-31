@@ -125,7 +125,7 @@ fn breakdown(text: &str) {
         parsing += start.elapsed();
         if let Ok(ast) = ast {
             let start = Instant::now();
-            builder.add_block(&ast, block.body_line() - 1);
+            builder.add_block(&ast, &block.body, block.body_line() - 1);
             building += start.elapsed();
         }
     }

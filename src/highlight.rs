@@ -70,6 +70,8 @@ pub enum TokenKind {
     String,
     /// `:` `,` `;` `[` `]`.
     Punctuation,
+    /// `//` to the end of the line.
+    Comment,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -143,10 +145,11 @@ fn whole(line: &str, kind: TokenKind) -> Token {
     }
 }
 
-/// Inside a cola fence: entities, fields, values. `in_string` says the
-/// line starts inside a `"""` block string; the returned flag says
-/// whether the next one does.
-fn cola_tokens(line: &str, in_string: bool) -> (Vec<Token>, bool) {
+/// Inside a cola fence: entities, fields, values, comments. `in_string`
+/// says the line starts inside a `"""` block string; the returned flag
+/// says whether the next one does. The model builder uses this lexer
+/// too, to find the comments the parser skips as layout.
+pub(crate) fn cola_tokens(line: &str, in_string: bool) -> (Vec<Token>, bool) {
     let b = line.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
@@ -164,6 +167,13 @@ fn cola_tokens(line: &str, in_string: bool) -> (Vec<Token>, bool) {
     }
     while i < b.len() {
         let c = b[i];
+        if line[i..].starts_with("//") {
+            out.push(Token {
+                range: i..line.trim_end_matches(['\n', '\r']).len(),
+                kind: TokenKind::Comment,
+            });
+            break;
+        }
         if line[i..].starts_with("\"\"\"") {
             let start = i;
             match line[i + 3..].find("\"\"\"") {
@@ -385,5 +395,18 @@ mod tests {
             let (t, _) = line_tokens(p, LineState::BARE_COLA);
             assert_eq!(t[0].kind, TokenKind::Punctuation, "{p}");
         }
+        assert!(grammar.contains("WS: /(\\s+|\\/\\/[^\\n]*)+/"));
+        let (t, _) = line_tokens("x: 1, // note\n", LineState::BARE_COLA);
+        assert_eq!(t.last().unwrap().kind, TokenKind::Comment);
+    }
+
+    #[test]
+    fn comments_run_to_eol_and_strings_hide_them() {
+        use TokenKind::*;
+        let got = run("```cola\na: // header\n    url: \"http://x\", // trailing\n;\n```\n");
+        assert!(got.contains(&("// header".into(), Comment)));
+        assert!(got.contains(&("\"http://x\"".into(), String)));
+        assert!(got.contains(&("// trailing".into(), Comment)));
+        assert_eq!(got.iter().filter(|(_, k)| *k == Comment).count(), 2);
     }
 }
