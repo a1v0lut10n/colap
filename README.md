@@ -127,6 +127,63 @@ model plural models:
 
 ---
 
+## 🔢 Numbers and time
+
+### Numbers are kept exactly as written
+
+A number literal (`8`, `8.0`, `1_048_576`, `1.5e-3`,
+`123456789012345678901234567890`) becomes `ConfigValue::Number`, which
+holds the literal's exact decimal: no size limit, no rounding, no
+respelling beyond dropping digit separators. `0.1` is a tenth, `1.10`
+keeps its trailing zero, and a thirty-digit integer survives `check` and
+`fmt` untouched. Equality and order are numeric (`1.10 == 1.1 == 11e-1`),
+the literal's kind (integer or float) is kept from its spelling, and the
+machine type is the reader's choice:
+
+| View | For |
+|---|---|
+| `as_i64()` | an integral value that fits 64 bits, `None` otherwise |
+| `as_f64()` | the nearest double |
+| `decimal()` | the sign, the significand digits and the power of ten: what an arbitrary-precision consumer needs to rebuild the value without loss |
+| `text()` | the canonical literal |
+
+The `decimal()` view exists for consumers that never go through a float.
+[claimr](https://github.com/a1v0lut10n/claimr), the constraint logic
+language in the same workspace, keeps every number as an exact rational;
+a cola record feeds it `digits × 10^exponent` and gets `37/2` for `18.5`,
+not the nearest double. Schema types name the machine type for generated
+code: `integer` (`i64`), `float` and `number` (`f64`), and `decimal`,
+which keeps the exact `Number` in the generated struct. The design is
+recorded in `docs/design/2026-10-31-exact-numbers.md`.
+
+### Two kinds of time, never one type
+
+cola has no date literal; a schema types a string field, and `colap
+check --schema` checks the text:
+
+| Schema type | Holds | Example |
+|---|---|---|
+| `instant` | transaction time: an RFC 3339 date-time with `Z` or an offset, a real moment | `"2026-10-30T14:05:00Z"` |
+| `date` | valid time at year, month or day precision | `"1914"`, `"1914-08"`, `"1914-08-04"` |
+| `datetime` | civil date and time with no offset, optionally with an IANA zone in brackets | `"2026-10-30T09:00[Europe/Zurich]"` |
+| `edtf` | EDTF levels 0 and 1: uncertain, approximate, unspecified digits, seasons, intervals | `"1914?"`, `"191X"`, `"1914/1918"`, `"1914/.."` |
+
+An instant says when something was recorded; the other three say when a
+fact held in the world, at the precision the source gives, and a
+knowledge graph's temporal predicates work on those intervals. A value
+with an offset is an instant and one without is civil, so a `datetime`
+holding `…Z` is a finding. The workspace's naming rule is checked too: a
+field ending in `_utc` must be an `instant`, an `instant` should end in
+`_utc`, and an instant in a `_utc` field written with an offset other
+than `Z` is warned about; `utc_suffix: false` on the schema switches the
+rule off. Canonical form never rewrites a temporal value: an offset stays
+as the source wrote it. Generated code reads all four as `String`; typed
+values behind a feature flag are a possible later step. The reasoning is
+in `docs/incubation/2026-10-30-temporal-values.md` and the forms in
+`docs/spec/schema.md`, section 4.
+
+---
+
 ## 🔧 Features
 
 ### Parser
@@ -437,6 +494,8 @@ The generator maps Cola types to Rust types as follows:
 | String, Symbol, Reference | `String` |
 | Number of integer kind (`8`) | `i64`, when the value fits |
 | Number of float kind (`8.0`, `1e3`) | `f64`, the nearest double |
+| Schema type `decimal` | `colap::config_model::Number`, the exact value |
+| Schema types `instant`, `date`, `datetime`, `edtf` | `String`, checked by the schema |
 | Boolean | `bool` |
 | List | `Vec<T>` of the elements' type, `Vec<ConfigValue>` when empty or mixed |
 | Entity | Custom struct |
