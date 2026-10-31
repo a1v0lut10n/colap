@@ -166,7 +166,7 @@ Add `colap` to your Rust project:
 
 ```toml
 [dependencies]
-colap = "0.1"
+colap = "0.4"
 ```
 
 ---

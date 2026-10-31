@@ -6,8 +6,51 @@ All notable changes to colap. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-31
+
+The knowledge repository's needs after 0.3 drove this release: comments
+that survive formatting, numbers that survive at all, and schemas. cola
+now has `//` comments, keeps every number exactly as written, and can
+declare in a schema the shape a document must have, which `colap check
+--schema` enforces and `colap generate --schema` turns into Rust types.
+The language is a superset of 0.3 except that an integer past 64 bits is
+no longer an error.
+
+### Breaking
+
+- **One number.** `ConfigValue::Integer(i64)` and `ConfigValue::Float(f64)`
+  are replaced by `ConfigValue::Number(Number)`, the literal's exact
+  decimal of any size with its kind kept from the spelling
+  (`is_integer()`); read it with `as_i64()`, `as_f64()`, `decimal()` or
+  `text()`. Equality and order are numeric. `canonical::float_text` is
+  gone; `integer out of range` has left the diagnostics; the generated
+  `i64` reader skips a value that does not fit
+  (`docs/design/2026-10-31-exact-numbers.md`).
+- **`ModelBuilder::add_block` takes the block text** as well as the
+  AST, `add_block(&ast, body, line_offset)`, to find the comments the
+  parser skips. `ConfigField` gained `comments`, `EntityNode` gained
+  `comments` and `closing`, `Report` gained `findings`, and `TokenKind`
+  gained `Comment`: struct literals and exhaustive matches need the
+  new members.
+- **Generated crates depend on the published colap** (`colap =
+  "0.4.0"`) instead of the relative path `../colap`; `--colap-path
+  <DIR>` restores a path dependency for local builds.
+- The canonical layout writes a number in its own spelling, without
+  digit separators, a leading `+` or leading integer zeros: `1.10`
+  stays `1.10`, `1e3` stays `1e3`; the former exponent form past twenty
+  characters is gone. `colap fmt` may reflow files whose numbers it
+  used to rewrite.
+
 ### Added
 
+- **Comments.** `//` to the end of the line inside cola blocks, layout
+  to the grammar and never a value. The model keeps them (`Comments` on
+  every field, and on every entity's header and close; the root's
+  `closing.leading` holds a block's end comments) and `colap fmt`
+  writes them back in place. Spec sections 3, 5.6 and 7.
+- **Exact numbers.** `Number`: `text()`, `is_integer()`, `as_i64()`,
+  `as_f64()`, `decimal()` for bignum consumers, `From<i64>`,
+  `From<f64>`, `Default`; `ConfigValue` is `PartialEq` and `Eq`.
 - **Schemas.** A schema is a cola document mirroring the shape of the
   documents it describes (`docs/spec/schema.md`,
   `docs/design/2026-10-31-schema-dialect.md`): entity declarations with
@@ -26,36 +69,9 @@ All notable changes to colap. The format follows
   one struct per declaration, enums for `symbol` fields with `one_of`,
   `Option` for what is not required, `Vec` for lists, `Number` for
   `decimal`; the generated code embeds the schema and `Root::load`
-  validates a file before building it. `--colap-path <DIR>` makes a
-  generated crate depend on a checkout; without it the crate depends
-  on the published colap instead of the old `../colap` path.
-- `ConfigValue` is `PartialEq` and `Eq`; `Number` is `Default` (zero);
-  `Diagnostic::at` builds a finding at a location.
-
-- **Comments.** `//` to the end of the line inside cola blocks, layout to
-  the grammar and never a value. The model keeps them (`Comments` on
-  every `ConfigField`, and `comments` and `closing` on every
-  `EntityNode`; the root's `closing.leading` holds a block's end
-  comments) and `colap fmt` writes them back in place; the highlighter
-  has `TokenKind::Comment`. Spec sections 3, 5.6 and 7.
-
-- **Exact numbers.** `ConfigValue::Number(Number)` holds a number
-  exactly as written, of any size: `text()`, `is_integer()` (the
-  literal's kind), `as_i64()`, `as_f64()`, `decimal()` for bignum
-  consumers, `From<i64>`, `From<f64>`; equality and order are numeric.
-  The canonical layout writes a number's own spelling without
-  separators, so `1.10` stays `1.10` (`docs/design/2026-10-31-exact-numbers.md`).
-
-### Breaking
-
-- `ConfigValue::Integer(i64)` and `ConfigValue::Float(f64)` are replaced
-  by `ConfigValue::Number`; `canonical::float_text` is gone; an integer
-  past 64 bits is no longer an error (`integer out of range` has left
-  the diagnostics) and the generator's `i64` reader skips a value that
-  does not fit.
-- `ModelBuilder::add_block` takes the block text as well as the AST:
-  `add_block(&ast, body, line_offset)`. `ConfigField` and `EntityNode`
-  gained public fields, and `TokenKind` a variant.
+  validates a file before building it. The input is optional,
+  validated first when given, and loaded by the crate's test.
+- `Diagnostic::at` builds a finding at a location.
 
 ## [0.3.0] — 2026-10-30
 
@@ -150,6 +166,7 @@ except for string escapes, which are now decoded.
 The release the field test ran against: the markdown-aware grammar, the
 code generator, and the editor highlighter.
 
-[Unreleased]: https://github.com/a1v0lut10n/colap/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/a1v0lut10n/colap/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/a1v0lut10n/colap/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/a1v0lut10n/colap/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/a1v0lut10n/colap/releases/tag/v0.2.0

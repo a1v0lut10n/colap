@@ -9,7 +9,7 @@ aspects: []
 # The cola language
 
 This document is the normative description of cola as implemented by colap
-0.3. Where the README and this document disagree, this document is right
+0.4. Where the README and this document disagree, this document is right
 and the README is a bug. It is itself a literate cola document: every
 ```` ```cola ```` block below is valid, and `colap check docs/spec/cola.md`
 is clean. Examples that show what is *not* allowed sit in `text` fences.
