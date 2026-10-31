@@ -28,6 +28,7 @@ pub mod highlight;
 pub mod literate;
 pub mod model;
 pub mod parser;
+pub mod schema;
 
 // Re-export key components for backward compatibility
 pub use diagnostic::{Diagnostic, Warning};
@@ -40,6 +41,7 @@ pub use model::source_location;
 pub use parser::cola;
 pub use parser::cola_actions;
 pub use rustemo;
+pub use schema::{Schema, load_schema, load_schema_file};
 
 use rustemo::Parser as _;
 use std::path::{Path, PathBuf};
@@ -52,14 +54,26 @@ pub struct Report {
     pub outcome: Result<ConfigModel, Error>,
     /// Independent of the outcome.
     pub warnings: Vec<Warning>,
+    /// What [`Report::validate`] found against a schema.
+    pub findings: Vec<Diagnostic>,
 }
 
 impl Report {
+    /// No error, from the reading or from a schema.
     pub fn is_clean(&self) -> bool {
-        self.outcome.is_ok()
+        self.outcome.is_ok() && !schema::has_errors(&self.findings)
     }
 
-    /// Errors and warnings together, in line order.
+    /// Validate the model against `schema`, keeping the findings on
+    /// the report. Nothing happens when the reading failed.
+    pub fn validate(&mut self, schema: &Schema) {
+        if let Ok(model) = &self.outcome {
+            self.findings
+                .extend(schema.validate(model, self.path.as_deref()));
+        }
+    }
+
+    /// Errors, warnings and schema findings together, in line order.
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
         let mut out = match &self.outcome {
             Ok(_) => Vec::new(),
@@ -70,7 +84,8 @@ impl Report {
                 .iter()
                 .map(|w| Diagnostic::from_warning(self.path.as_deref(), w)),
         );
-        out.sort_by_key(|d| d.line.unwrap_or(0));
+        out.extend(self.findings.iter().cloned());
+        out.sort_by_key(|d| (d.line.unwrap_or(0), d.column.unwrap_or(0)));
         out
     }
 
@@ -115,6 +130,7 @@ fn finish(builder: ModelBuilder, path: Option<&Path>, mut warnings: Vec<Warning>
         path: path.map(Path::to_path_buf),
         outcome,
         warnings,
+        findings: Vec::new(),
     }
 }
 
@@ -178,6 +194,7 @@ pub fn check_file(path: impl AsRef<Path>) -> Report {
                     source,
                 }),
                 warnings: Vec::new(),
+                findings: Vec::new(),
             };
         }
     };

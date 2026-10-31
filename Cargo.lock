@@ -198,6 +198,7 @@ dependencies = [
  "handlebars",
  "heck",
  "log",
+ "regex",
  "rustemo",
  "rustemo-compiler",
  "serde_json",

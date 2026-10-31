@@ -78,6 +78,13 @@ fn cli() -> Command {
                         .value_parser(["text", "cola"])
                         .default_value("text")
                         .help("text: one `path:line:col: severity: message` per finding; cola: a cola block of findings"),
+                )
+                .arg(
+                    Arg::new("schema")
+                        .long("schema")
+                        .value_name("SCHEMA")
+                        .value_parser(clap::value_parser!(PathBuf))
+                        .help("Validate each file against this schema, a cola document (docs/spec/schema.md)"),
                 ),
         )
         .subcommand(
@@ -137,23 +144,48 @@ fn main() -> ExitCode {
 fn check(matches: &ArgMatches) -> ExitCode {
     let files = matches.get_many::<PathBuf>("files").into_iter().flatten();
     let mut findings = Vec::new();
-    for path in files {
-        findings.extend(colap::check_file(path).diagnostics());
-    }
-
-    match matches.get_one::<String>("format").map(String::as_str) {
-        Some("cola") => print!("{}", diagnostic::to_cola(&findings)),
-        _ => {
-            for finding in &findings {
-                println!("{finding}");
+    // A schema that fails to load is reported alone: nothing can be
+    // validated against it.
+    let schema = match matches.get_one::<PathBuf>("schema") {
+        Some(path) => {
+            let loaded = colap::load_schema_file(path);
+            findings.extend(loaded.findings);
+            match loaded.schema {
+                Some(schema) if !findings.iter().any(|d| d.severity == Severity::Error) => {
+                    Some(schema)
+                }
+                _ => {
+                    print_findings(matches, &findings);
+                    return ExitCode::from(1);
+                }
             }
         }
+        None => None,
+    };
+    for path in files {
+        let mut report = colap::check_file(path);
+        if let Some(schema) = &schema {
+            report.validate(schema);
+        }
+        findings.extend(report.diagnostics());
     }
+    print_findings(matches, &findings);
 
     if findings.iter().any(|d| d.severity == Severity::Error) {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+fn print_findings(matches: &ArgMatches, findings: &[Diagnostic]) {
+    match matches.get_one::<String>("format").map(String::as_str) {
+        Some("cola") => print!("{}", diagnostic::to_cola(findings)),
+        _ => {
+            for finding in findings {
+                println!("{finding}");
+            }
+        }
     }
 }
 

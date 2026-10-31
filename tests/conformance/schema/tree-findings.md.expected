@@ -1,0 +1,2 @@
+<path>:11:21: error: missing required field `name` in `folder/root/folder/docs/folder/deep`
+<path>:11:27: error: unknown field `size` in `folder/root/folder/docs/folder/deep`

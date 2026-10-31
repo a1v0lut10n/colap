@@ -384,18 +384,21 @@ canonical:
 A code generator maps the model to types: a struct per singular entity, a
 collection type per plural entity with lookup by key and iteration in
 source order, and fields typed by their literal — `i64`, `f64`, `bool`,
-`String`. Type inference from literals is the current behaviour, not a
-commitment; schemas are an open decision (section 9).
+`String`. Type inference from literals is the current behaviour; a
+generator reading declarations from a schema is planned.
 
-## 9. Open decisions
+## 9. Schemas
 
-The following are not part of the language as specified. Each has a task
-and will be decided in a design record; this document is updated when a
-decision is accepted.
+A **schema** is a cola document declaring the shape other documents must
+have: which entities and fields, of which types, required or not, closed
+sets, bounds, patterns, typed references, instants and civil dates. A
+reader validates a document against a schema on request (`colap check
+--schema S.md FILE...`) and reports findings through the channel of
+section 6. The dialect is specified in `docs/spec/schema.md`.
 
-- **Schemas**: declaring the shape a document must have, and checking
-  against it (`docs/tasks/2026-10/2026-10-29-schema-validation.md`).
-  Typed date and instant literals and null values are deferred to it.
+There is no null literal: an optional field left out is the null. Typed
+temporal literals are not part of the language; a schema types a string
+field as an instant or a date instead.
 
 ## 10. The conformance corpus
 
@@ -407,6 +410,7 @@ the file's path; no sidecar means no diagnostics. The corpus is seeded with
 every reproduction from the 2026-10-29 field test.
 
 The test runner (`tests/conformance.rs`) checks every file against its
-sidecar, checks that this document is clean, and checks that the editor
-highlighter's identifier, symbol, reference, number and string tokens on
-every cola line are exactly the parser's located terminals.
+sidecar, checks that this document and the schema spec are clean, checks
+the schema corpus (`docs/spec/schema.md`, section 7), and checks that the
+editor highlighter's identifier, symbol, reference, number and string
+tokens on every cola line are exactly the parser's located terminals.

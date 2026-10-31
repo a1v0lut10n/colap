@@ -8,6 +8,23 @@ All notable changes to colap. The format follows
 
 ### Added
 
+- **Schemas.** A schema is a cola document mirroring the shape of the
+  documents it describes (`docs/spec/schema.md`,
+  `docs/design/2026-10-31-schema-dialect.md`): entity declarations with
+  `plural`, `required`, `unknown`, `key_pattern`, `like` and `doc`;
+  field declarations with `type`, `list`, `required`, `one_of`, `min`,
+  `max`, `pattern`, `to` and `doc`; types `string`, `integer`, `float`,
+  `number`, `decimal`, `boolean`, `symbol`, `reference`, `instant`,
+  `date`, `datetime`, `edtf`, `any`; the `_utc` naming rule. `colap
+  check --schema S.md FILE...` validates each file; the library has
+  `load_schema_file`, `load_schema`, `Schema::validate` and
+  `Report::validate`, with findings as `Diagnostic`s on
+  `Report::findings`. The meta-schema (`colap::schema::META`) checks
+  every schema first and validates itself. `regex` is a direct
+  dependency.
+- `ConfigValue` is `PartialEq` and `Eq`; `Diagnostic::at` builds a
+  finding at a location.
+
 - **Comments.** `//` to the end of the line inside cola blocks, layout to
   the grammar and never a value. The model keeps them (`Comments` on
   every `ConfigField`, and `comments` and `closing` on every

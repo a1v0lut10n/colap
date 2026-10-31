@@ -3,7 +3,9 @@
 //! the parser, the diagnostics, the highlighter and the spec to each
 //! other. Each file may carry a `NAME.expected` sidecar: its diagnostics,
 //! one per line, with `<path>` standing for the file's path. A valid
-//! file has no errors; an invalid file has at least one.
+//! file has no errors; an invalid file has at least one. The schema
+//! corpus (`tests/conformance/schema/`) pairs each `NAME.schema.md`
+//! with the `NAME-*.md` documents validated against it.
 use colap::highlight::{LineState, TokenKind, line_tokens};
 use colap::literate::scan;
 use colap::parser::cola::ColaParser;
@@ -72,10 +74,55 @@ fn invalid_files_have_errors_and_exactly_the_stated_diagnostics() {
 }
 
 #[test]
-fn the_spec_is_itself_a_clean_literate_document() {
-    let path = Path::new("docs/spec/cola.md");
-    let (clean, got) = diagnostics(path);
-    assert!(clean && got.is_empty(), "{}: {got:?}", path.display());
+fn the_specs_are_themselves_clean_literate_documents() {
+    for path in ["docs/spec/cola.md", "docs/spec/schema.md"] {
+        let path = Path::new(path);
+        let (clean, got) = diagnostics(path);
+        assert!(clean && got.is_empty(), "{}: {got:?}", path.display());
+    }
+}
+
+#[test]
+fn every_schema_pair_gives_exactly_the_stated_findings() {
+    let files = corpus("tests/conformance/schema");
+    let schemas: Vec<&PathBuf> = files
+        .iter()
+        .filter(|p| p.to_string_lossy().ends_with(".schema.md"))
+        .collect();
+    assert!(schemas.len() >= 5, "only {} schemas", schemas.len());
+    let mut documents = 0;
+    for schema_path in schemas {
+        let loaded = colap::load_schema_file(schema_path);
+        let got: Vec<String> = loaded.findings.iter().map(|d| d.to_string()).collect();
+        assert_eq!(got, expected(schema_path), "{}", schema_path.display());
+        let stem = schema_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.strip_suffix(".schema.md"))
+            .expect("schema file name");
+        if stem.starts_with("invalid-") {
+            assert!(
+                !loaded.is_clean(),
+                "{} should fail to load",
+                schema_path.display()
+            );
+            continue;
+        }
+        assert!(loaded.is_clean(), "{}: {got:?}", schema_path.display());
+        let schema = loaded.schema.expect("clean schema");
+        let prefix = format!("{stem}-");
+        for doc in files.iter().filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            name.starts_with(&prefix) && !name.ends_with(".schema.md")
+        }) {
+            let mut report = colap::check_file(doc);
+            report.validate(&schema);
+            let got: Vec<String> = report.diagnostics().iter().map(|d| d.to_string()).collect();
+            assert_eq!(got, expected(doc), "{}", doc.display());
+            documents += 1;
+        }
+    }
+    assert!(documents >= 5, "only {documents} documents validated");
 }
 
 // ---- Token-level parity: the highlighter's identifier, number and
@@ -233,7 +280,9 @@ fn highlighter_tokens_are_the_parsers_terminals() {
     files.extend(corpus("tests/conformance/invalid"));
     files.extend(corpus("tests/data"));
     files.extend(corpus("tests/data/fmt"));
+    files.extend(corpus("tests/conformance/schema"));
     files.push(PathBuf::from("docs/spec/cola.md"));
+    files.push(PathBuf::from("docs/spec/schema.md"));
     let mut compared = 0;
     for path in files {
         if path.extension().is_some_and(|e| e == "cola") {

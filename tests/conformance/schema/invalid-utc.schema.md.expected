@@ -1,0 +1,2 @@
+<path>:9:17: warning: field `recorded_at` of `event` is an instant and should end in `_utc`
+<path>:10:17: error: field `created_utc` of `event` ends in `_utc` and must be an instant, not a string

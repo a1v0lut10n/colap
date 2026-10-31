@@ -2,11 +2,17 @@
 date: 2026-10-31
 type: task
 ticket: COLA-0011
-status: in-progress
+status: done
 affects:
   - src/lib.rs
   - src/main.rs
   - src/diagnostic.rs
+  - src/schema/mod.rs
+  - src/schema/dialect.rs
+  - src/schema/validate.rs
+  - src/schema/temporal.rs
+  - src/schema/meta.md
+  - docs/spec/schema.md
   - docs/spec/cola.md
   - README.md
   - CHANGELOG.md
@@ -98,13 +104,36 @@ generator's `--schema` is the ticket after it.
    the temporal types, `utc_suffix: false`), the meta-schema
    self-check, a CLI test, and the task file set done.
 
+## What was built
+
+As planned. Settled on the way:
+
+- `unknown` is also a field of the `schema` entity, for root entities
+  the schema does not name; without it a literate document holding
+  other cola beside the described entities had no way to be accepted.
+- `any` without `list` accepts a list too, since it accepts anything.
+- The `like` reference names the declaration entry by the model's
+  path, which runs through the collection's singular name:
+  `@schema/entity/folder` for the declaration `folder` under
+  `schema`, and `@schema/entity/schema/entity/entity` inside the
+  meta-schema. Verbose, mechanical, and resolved by the parser.
+- The schema's own shapes live in an arena (`Schema::shapes`) so that
+  `like` can alias one, recursion included; `Schema::shape(id)` reads
+  one back.
+- EDTF qualifiers stand after the date (`1914?`, `1850~`), as the
+  specification writes them; the `~1850` spelling of the incubation
+  entry is level 2 and not accepted. The spec tables the forms.
+- The regex crate's error spans lines; the finding carries its last
+  line, which names the problem.
+
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] Every corpus document's findings equal its sidecar; every
-      invalid schema's load findings equal its sidecar; the meta-schema
-      validates itself; both spec documents are clean.
-- [ ] `colap check --schema` on the knowledge-repository-shaped sample
-      reports each kind of violation once, at its line.
-- [ ] `cargo bench --bench scale` does not move (validation is not
-      on the bench's path).
+- [x] The three Rust gates are clean (107 tests).
+- [x] Every corpus document's findings equal its sidecar (seven
+      documents under four schemas); every invalid schema's load
+      findings equal its sidecar (three); the meta-schema validates
+      itself; both spec documents are clean; token parity covers the
+      schema corpus.
+- [x] `colap check --schema` on `registry-findings.md` reports each
+      kind of finding once, at its line (24 findings, 2 warnings).
+- [x] `cargo bench --bench scale` does not move.

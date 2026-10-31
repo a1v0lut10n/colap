@@ -1,0 +1,8 @@
+<path>:9:38: error: one_of of `basis` in `llm` holds "parsed", which is not a symbol
+<path>:10:38: error: min of `size` in `llm` is above its max
+<path>:11:35: error: pattern of `id` in `llm` is not a valid regular expression: invalid character class range, the start must be <= the end
+<path>:12:39: error: pattern of `count` in `llm` applies to strings and symbols, not an integer
+<path>:13:39: error: to of `vendor` in `llm` applies to references, not a string
+<path>:17:21: error: `llm/api` has `like` and declares fields or entities of its own
+<path>:20:24: error: like of `llm/other` must point to another declaration, not `@schema`
+<path>:24:13: error: key_pattern of `database` applies to collections

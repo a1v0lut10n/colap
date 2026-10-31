@@ -1,0 +1,23 @@
+<path>:5:5: error: key `Bad` in `llm` does not match pattern `[a-z][a-z0-9.-]*`
+<path>:5:5: error: missing required field `name` in `llm/Bad`
+<path>:6:9: error: field `max_input_tokens` in `llm/Bad` must be an integer, got "many"
+<path>:7:9: error: value 101 of `output_price` in `llm/Bad` is above the maximum 100
+<path>:8:9: error: field `supports_vision` in `llm/Bad` must be a boolean, got "yes"
+<path>:9:9: error: value guessed of `basis` in `llm/Bad` is not one of [mirrored, parsed, derived]
+<path>:10:9: error: field `tags` in `llm/Bad` must be a list of symbol, got alpha
+<path>:11:9: error: value @llms/other of `vendor` in `llm/Bad` must point to an entry of `vendor`
+<path>:12:9: error: value "2026-02-30T00:00:00Z" of `recorded_at_utc` in `llm/Bad` is not an instant
+<path>:13:9: error: value "X" of `id` in `llm/Bad` does not match pattern `[a-z]+-[0-9]+`
+<path>:14:9: error: unknown field `nmae` in `llm/Bad`
+<path>:15:14: error: value SOAP of `type` in `llm/Bad/api` is not one of [REST, gRPC]
+<path>:19:9: error: value 0 of `max_input_tokens` in `llm/other` is below the minimum 1
+<path>:20:9: error: field `basis` in `llm/other` must be a symbol, got [parsed]
+<path>:21:9: warning: value "2026-10-30T14:05:00+02:00" of `recorded_at_utc` in `llm/other` is not written in UTC
+<path>:26:9: error: field `max_input_tokens` in `llm/huge` must fit a 64-bit integer, got 99999999999999999999
+<path>:32:9: error: field `max_input_tokens` in `llm/fractional` must be an integer, got 8.0
+<path>:40:9: error: value "1914-13" of `founded` in `vendor/acme` is not a date
+<path>:41:9: error: value "1914??" of `active` in `vendor/acme` is not an EDTF date
+<path>:42:9: error: value "2026-10-30T09:00Z" of `meeting` in `vendor/acme` is not a datetime
+<path>:43:9: warning: unknown field `motto` in `vendor/acme`
+<path>:46:1: error: entity `database` in the root is `database plural databases`, but the schema declares `database`
+<path>:49:1: error: unknown entity `stray` in the root
