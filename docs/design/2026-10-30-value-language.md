@@ -117,6 +117,10 @@ conformance corpus has one such file, which the migration note covers.
 
 ### Numbers
 
+*The value's representation decided here, `i64` or `f64`, is
+superseded by `docs/design/2026-10-31-exact-numbers.md`: the model
+keeps every number exactly as written. The lexical form stands.*
+
 `[+-]?[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?`: digit
 separators as in Rust, an exponent part. A literal with a decimal
 point or an exponent is a float; otherwise an integer, and out of the
