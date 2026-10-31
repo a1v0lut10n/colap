@@ -22,7 +22,7 @@
 use crate::model::config_model::{Comments, ConfigModel, ConfigValue, NodeId};
 use crate::model::literal;
 
-pub use crate::model::literal::{float_text, quote};
+pub use crate::model::literal::quote;
 
 /// Line width beyond which an entity is written one field per line.
 pub const WIDTH: usize = 80;
@@ -31,8 +31,7 @@ const INDENT: &str = "    ";
 /// A value as one-line cola text.
 pub fn value_text(value: &ConfigValue) -> String {
     match value {
-        ConfigValue::Integer(i) => i.to_string(),
-        ConfigValue::Float(f) => float_text(*f),
+        ConfigValue::Number(n) => n.text().to_string(),
         ConfigValue::Boolean(b) => b.to_string(),
         ConfigValue::String(s) => quote(s),
         ConfigValue::Symbol(s) => s.clone(),
@@ -189,7 +188,7 @@ mod tests {
             value_text(&List(vec![
                 Symbol("a".into()),
                 String("b c".into()),
-                Integer(3)
+                Number(3.into())
             ])),
             "[a, \"b c\", 3]"
         );
@@ -201,10 +200,10 @@ mod tests {
         let root = model.root_id();
         let a = model.add_entity(root, "a", None, None).unwrap();
         model
-            .add_field_to_entity(a, "x", ConfigValue::Integer(1))
+            .add_field_to_entity(a, "x", ConfigValue::Number(1.into()))
             .unwrap();
         model
-            .add_field_to_entity(a, "y", ConfigValue::Float(2.0))
+            .add_field_to_entity(a, "y", ConfigValue::Number(2.0.into()))
             .unwrap();
         let b = model.add_entity(root, "b", Some("bs"), None).unwrap();
         let k = model.add_entity(b, "k", None, None).unwrap();
@@ -239,10 +238,10 @@ mod tests {
         let root = model.root_id();
         let a = model.add_entity(root, "a", None, None).unwrap();
         model
-            .add_field_to_entity(a, "x", ConfigValue::Integer(1))
+            .add_field_to_entity(a, "x", ConfigValue::Number(1.into()))
             .unwrap();
         model
-            .add_field_to_entity(a, "y", ConfigValue::Integer(2))
+            .add_field_to_entity(a, "y", ConfigValue::Number(2.into()))
             .unwrap();
         {
             let node = model.get_node(a).unwrap();
@@ -256,7 +255,7 @@ mod tests {
         }
         let b = model.add_entity(root, "b", None, None).unwrap();
         model
-            .add_field_to_entity(b, "x", ConfigValue::Integer(1))
+            .add_field_to_entity(b, "x", ConfigValue::Number(1.into()))
             .unwrap();
         model.get_node(b).unwrap().borrow_mut().closing.trailing = Some(" short".into());
         model
@@ -276,7 +275,7 @@ mod tests {
     fn multi_line_strings_become_blocks() {
         let model = model_with(&[
             ("gloss", ConfigValue::String("one\ntwo".into())),
-            ("n", ConfigValue::Integer(1)),
+            ("n", ConfigValue::Number(1.into())),
         ]);
         assert_eq!(
             model.to_cola(),

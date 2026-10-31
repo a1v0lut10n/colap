@@ -72,9 +72,11 @@ are the whole representation.
 ### Canonical form
 
 The canonical layout writes a number as its literal with digit
-separators dropped, a leading `+` dropped and the exponent letter in
-lower case, and nothing else changed: `1.10` stays `1.10`, `1e3` stays
-`1e3`, `1_000` becomes `1000`. The former rule that a float past twenty
+separators dropped, a leading `+` dropped, leading zeros of the
+integer part dropped (`007` is `7`, `0.5` keeps its zero) and the
+exponent letter in lower case, and nothing else changed: `1.10` stays
+`1.10`, since a trailing zero in the fraction may say how precise the
+value is, `1e3` stays `1e3`, `1_000` becomes `1000`. The former rule that a float past twenty
 characters is rewritten in exponent form goes with the `f64` it
 served; there is no longer a machine value to render from.
 

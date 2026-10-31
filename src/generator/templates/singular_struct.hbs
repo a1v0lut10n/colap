@@ -52,13 +52,16 @@ impl {{struct_name}} {
                     }
                     {{/if}}
                     {{#if (eq type "i64")}}
-                    if let colap::model::config_model::ConfigValue::Integer(i) = val {
-                        result.{{name}} = *i;
+                    if let colap::model::config_model::ConfigValue::Number(n) = val {
+                        // The generated crate is edition 2021: no let chains.
+                        if let Some(i) = n.as_i64() {
+                            result.{{name}} = i;
+                        }
                     }
                     {{/if}}
                     {{#if (eq type "f64")}}
-                    if let colap::model::config_model::ConfigValue::Float(f) = val {
-                        result.{{name}} = *f;
+                    if let colap::model::config_model::ConfigValue::Number(n) = val {
+                        result.{{name}} = n.as_f64();
                     }
                     {{/if}}
                     {{#if (eq type "bool")}}

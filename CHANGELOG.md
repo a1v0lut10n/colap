@@ -15,8 +15,20 @@ All notable changes to colap. The format follows
   comments) and `colap fmt` writes them back in place; the highlighter
   has `TokenKind::Comment`. Spec sections 3, 5.6 and 7.
 
+- **Exact numbers.** `ConfigValue::Number(Number)` holds a number
+  exactly as written, of any size: `text()`, `is_integer()` (the
+  literal's kind), `as_i64()`, `as_f64()`, `decimal()` for bignum
+  consumers, `From<i64>`, `From<f64>`; equality and order are numeric.
+  The canonical layout writes a number's own spelling without
+  separators, so `1.10` stays `1.10` (`docs/design/2026-10-31-exact-numbers.md`).
+
 ### Breaking
 
+- `ConfigValue::Integer(i64)` and `ConfigValue::Float(f64)` are replaced
+  by `ConfigValue::Number`; `canonical::float_text` is gone; an integer
+  past 64 bits is no longer an error (`integer out of range` has left
+  the diagnostics) and the generator's `i64` reader skips a value that
+  does not fit.
 - `ModelBuilder::add_block` takes the block text as well as the AST:
   `add_block(&ast, body, line_offset)`. `ConfigField` and `EntityNode`
   gained public fields, and `TokenKind` a variant.

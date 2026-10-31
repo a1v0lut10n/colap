@@ -38,7 +38,7 @@ fn top_level_names(model: &ConfigModel) -> Vec<String> {
 fn field_int(model: &ConfigModel, path: &str, field: &str) -> Option<i64> {
     let id = model.find_entity_by_path(path)?;
     match model.get_field_value(id, field)? {
-        ConfigValue::Integer(i) => Some(i),
+        ConfigValue::Number(n) => n.as_i64(),
         other => panic!("{path}.{field} is {other:?}"),
     }
 }

@@ -2,7 +2,7 @@
 date: 2026-10-31
 type: task
 ticket: COLA-0010
-status: in-progress
+status: done
 affects:
   - src/model/config_model.rs
   - src/model/literal.rs
@@ -51,12 +51,30 @@ This ticket lands before the validator.
    exactness, numeric equality and the views; the generated crate
    check in the generator tests covers the new template arms.
 
+## What was built
+
+As planned, with three details settled on the way:
+
+- Canonical spelling also drops leading zeros of the integer part
+  (`007` is `7`), since they say nothing, while a trailing zero in the
+  fraction stays, since it may say how precise the value is. The
+  record and the spec say so.
+- `From<f64>` writes the shortest text that reads back as the same
+  double, in exponent form past twenty characters, as the old
+  `float_text` did, so a value built from a double still prints
+  sanely; infinities and NaN, which no literal writes, become `0.0`.
+- The generated crate is edition 2021, so the `i64` reader nests two
+  `if let`s rather than a let chain. A crate generated from a sample
+  with integers, floats, a 20-digit integer and numeric lists builds
+  against this checkout.
+
 ## Verification
 
-- [ ] The three Rust gates are clean.
-- [ ] Corpus, spec and token parity hold; every clean fixture still
-      round-trips and `fmt` is idempotent.
-- [ ] `1.10`, `1_000`, `1e3` and a 30-digit integer survive
-      `check` and `fmt` unchanged in value and, bar separators, in
-      spelling.
-- [ ] `cargo bench --bench scale` does not move.
+- [x] The three Rust gates are clean (96 tests).
+- [x] Corpus, spec and token parity hold; every clean fixture still
+      round-trips and `fmt` is idempotent; `big-numbers.md` is in the
+      valid corpus.
+- [x] `1.10`, `1_000`, `2E10` and a 30-digit integer survive `check`
+      and `fmt` unchanged in value and, bar separators and case, in
+      spelling (`tests/values.rs`).
+- [x] `cargo bench --bench scale`: 51.6 µs per entry, as main.

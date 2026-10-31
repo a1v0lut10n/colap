@@ -108,10 +108,11 @@ insignificant except as a separator. Indentation carries no meaning.
   before it when blank, and the longest common leading whitespace of the
   non-blank lines removed from every line.
 - **Number**: `[+-]?[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?`.
-  Underscores separate digits and are dropped. With a decimal point or an
-  exponent the value is a 64-bit float; without, a 64-bit signed integer,
-  and a digit string outside that range is an error. There is no leading
-  `.`.
+  Underscores separate digits and are dropped. The value is the exact
+  decimal the literal writes, of any size: no digit is rounded or lost,
+  and `0.1` is a tenth. A literal with a decimal point or an exponent is
+  of float kind, any other of integer kind; `8` and `8.0` are the same
+  value of different kinds. There is no leading `.`.
 - **Boolean**: `true` or `false`.
 - **Symbol**: an identifier in value position, `basis: parsed`. `plural`
   is a symbol there, since it is a keyword only where a keyword can stand.
@@ -248,10 +249,15 @@ error.
 
 ### 5.5 Values
 
-A field's value is an integer, a float, a boolean, a string, a symbol, a
-reference, or a list of those, as section 3 lexes them. Type is decided
-by the literal alone: `8` is an integer, `8.0` and `8e0` are floats,
-`"parsed"` is a string and `parsed` a symbol.
+A field's value is a number, a boolean, a string, a symbol, a reference,
+or a list of those, as section 3 lexes them. Type is decided by the
+literal alone: `8` is a number of integer kind, `8.0` and `8e0` are
+numbers of float kind, `"parsed"` is a string and `parsed` a symbol.
+Numbers compare by value, so `1.10`, `1.1` and `11e-1` are equal, and
+each keeps its spelling. A reader that wants a machine type takes it
+from the number: a 64-bit integer when the value is integral and fits,
+the nearest double, or the digits and their power of ten for exact
+arithmetic (`docs/design/2026-10-31-exact-numbers.md`).
 
 A reference's path names an entity from the root the way section 5.2
 names it: each segment is the singular or plural name of a plural, the
@@ -303,9 +309,8 @@ path: severity: message            (no location)
 
 A duplicate's message names the entity and ends with the first location:
 `duplicate entry `cl-1` in `claim`; first at 5:5`. An unknown escape
-reads `unknown escape `\q``, a reference to nothing `unresolved
-reference `@claims/cl-9``, and an integer past 64 bits `integer out of
-range: N`.
+reads `unknown escape `\q`` and a reference to nothing `unresolved
+reference `@claims/cl-9``.
 
 Warnings a reader must give:
 
@@ -330,11 +335,11 @@ pure function of the model:
   never touches the line before it; child entities follow, and `;` closes
   on its own line at the header's indentation;
 - fields come before child entities, both in source order;
-- an integer is written in decimal without a sign for non-negative values
-  and without digit separators; a float always carries a decimal point,
-  and takes the exponent form (`1.0e300`) when its plain decimal would run
-  past twenty characters; booleans are `true` and `false`; a symbol is
-  bare and a reference is `@path`;
+- a number is its literal with digit separators, a leading `+` and
+  leading zeros of the integer part dropped and the exponent letter in
+  lower case, nothing else changed: `007` is `7`, `1.10` stays `1.10`
+  and `1e3` stays `1e3`; booleans are `true` and
+  `false`; a symbol is bare and a reference is `@path`;
 - a list is written `[a, b, c]` on its field's line when that line fits in
   80 columns, otherwise one element per line, each ending in `,`, one
   level deeper, with `]` at the field's indentation; an empty list is

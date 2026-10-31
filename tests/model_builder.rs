@@ -98,10 +98,14 @@ fn test_model_builder_with_test_genite() {
                 "Failed to find max_input_tokens field in gpt-4.1 model entity"
             );
 
-            if let Some(ConfigValue::Integer(value)) = tokens {
-                assert_eq!(value, 1047576, "max_input_tokens field has incorrect value");
+            if let Some(ConfigValue::Number(value)) = tokens {
+                assert_eq!(
+                    value.as_i64(),
+                    Some(1047576),
+                    "max_input_tokens field has incorrect value"
+                );
             } else {
-                panic!("max_input_tokens field is not an Integer or has incorrect value");
+                panic!("max_input_tokens field is not a number or has incorrect value");
             }
         }
     }
