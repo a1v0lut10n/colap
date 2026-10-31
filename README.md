@@ -91,7 +91,7 @@ llm plural llms:
 The language is specified in [`docs/spec/cola.md`](docs/spec/cola.md), a
 literate document that colap itself checks; a conformance corpus under
 `tests/conformance/` holds the parser, the diagnostics and the highlighter to
-it. Schemas are the one open decision listed there.
+it. Schemas have their own spec, [`docs/spec/schema.md`](docs/spec/schema.md).
 
 ---
 
@@ -144,6 +144,10 @@ model plural models:
   resolves
 - `//` comments inside cola blocks, kept in the model and written back in
   place by `colap fmt`
+- Schemas, written in cola: `colap check --schema S.md FILE...` reports
+  missing and unknown members, wrong kinds, values outside closed sets,
+  bounds and patterns, references to the wrong place, and malformed
+  instants and dates (`docs/spec/schema.md`)
 - Reads large files in linear time: a 10k-entry ledger (5 MB) in about
   0.4 s; `cargo bench --bench scale` guards it
 
@@ -198,7 +202,7 @@ The colap codebase is organized into the following modules:
 
 ```bash
 USAGE:
-    colap check [--format <text|cola>] <FILE>...
+    colap check [--format <text|cola>] [--schema <SCHEMA>] <FILE>...
     colap fmt [--check] <FILE>...
     colap generate [OPTIONS] <input>
     colap [OPTIONS] <input>              # the same as `generate`
@@ -247,6 +251,40 @@ embedded in a literate document.
 
 The same checks run before every `generate`, which prints the findings to
 stderr and exits 1 on errors.
+
+#### Validating against a schema
+
+A schema is a cola document that mirrors the shape of the documents it
+describes:
+
+```cola
+schema:
+    entity plural entities:
+        llm:
+            plural: llms,
+            field plural fields:
+                name: type: string, required: true;
+                max_input_tokens: type: integer, min: 1;
+                basis: type: symbol, one_of: [mirrored, parsed, derived];
+                recorded_at_utc: type: instant, required: true;
+            ;
+        ;
+    ;
+;
+```
+
+```bash
+colap check --schema registry.schema.md registry.md
+# registry.md:5:5: error: missing required field `recorded_at_utc` in `llm/gpt-4.1`
+# registry.md:6:9: error: field `max_input_tokens` in `llm/gpt-4.1` must be an integer, got "many"
+```
+
+Types: `string`, `integer`, `float`, `number`, `decimal`, `boolean`,
+`symbol`, `reference` (with `to`), `instant`, `date`, `datetime`, `edtf`,
+`any`, each optionally a `list`; constraints `required`, `one_of`, `min`,
+`max`, `pattern`; `unknown: error | warn | allow` per entity;
+`key_pattern` on collections; `like` to reuse a declaration. The
+dialect's own schema ships in the crate and checks every schema first.
 
 #### Formatting files
 

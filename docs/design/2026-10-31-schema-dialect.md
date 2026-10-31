@@ -119,6 +119,7 @@ An **entity declaration** has these fields, all optional:
 | `required` | boolean | The entity must be present in its parent. Default `false`. |
 | `unknown` | symbol | What to do with a field or child entity the declaration does not name: `error` (default), `warn`, `allow`. |
 | `key_pattern` | string | A regular expression every entry key must match in full. Collections only. |
+| `like` | reference | Another declaration in this schema whose fields and children this one has; it then declares none of its own. For shared shapes, and for trees (a declaration that contains itself). |
 | `doc` | string | Documentation, carried into generated code. |
 
 and two collections: `field plural fields`, keyed by field name, and
@@ -221,7 +222,10 @@ error, as it does today. Warnings never fail a check.
 ### The schema is checked by a schema
 
 The dialect above is itself declared in a schema, the meta-schema,
-shipped inside the crate. Loading a schema validates it against the
+shipped inside the crate. A declaration contains declarations, which
+the mirrored tree can only say by naming one: `like` was added to the
+dialect for this (planning note in the COLA-0011 plan), and serves
+any document whose shape recurs or repeats. Loading a schema validates it against the
 meta-schema with the same validator, so a misspelled `requried: true`
 or a `type: strnig` is reported at its line before any document is
 checked. The meta-schema validates itself; that is a test.
@@ -276,6 +280,7 @@ generator ticket decides the rest.
   order dates, which nothing here requires.
 - Deferred: in-band binding through frontmatter; merging several
   files into one model before validation; `min_entries` and string
-  lengths; declarations shared between entities (`extends`); typed
+  lengths; declarations that add to another (`extends`; `like` only
+  reuses one); typed
   temporal values in generated code; exact rationals in generated
   code behind a feature flag.

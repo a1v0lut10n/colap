@@ -88,6 +88,22 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    /// A finding at a location in `path`.
+    pub fn at(
+        severity: Severity,
+        path: Option<&Path>,
+        location: Option<&SourceLocation>,
+        message: String,
+    ) -> Diagnostic {
+        Diagnostic {
+            severity,
+            path: path.map(Path::to_path_buf),
+            line: location.map(|l| l.start_line),
+            column: location.map(|l| l.start_column + 1),
+            message,
+        }
+    }
+
     /// Every error inside `error`, flattening [`Error::Multiple`].
     pub fn from_error(error: &Error) -> Vec<Diagnostic> {
         error

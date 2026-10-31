@@ -1,7 +1,7 @@
 ---
 date: 2026-10-29
 type: task
-status: planned
+status: in-progress
 affects:
   - README.md
 tags: [schema, validation, language-design]
@@ -63,6 +63,14 @@ example values.
 - Cross-file reference resolution across a whole repository. colap validates one model,
   possibly merged from several files given on the command line; repository-wide indexing
   stays with downstream tools.
+
+## Progress note
+
+Decided in `docs/design/2026-10-31-schema-dialect.md` (accepted
+2026-10-31), with numbers made exact first (COLA-0010). COLA-0011 built
+deliverables 1, 2 and 4: the dialect, `colap check --schema`, the
+meta-schema, the spec `docs/spec/schema.md` and the schema corpus.
+Deliverable 3, the generator's `--schema`, is the next ticket.
 
 ## Completion
 

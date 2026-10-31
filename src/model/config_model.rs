@@ -26,7 +26,7 @@ pub type NodeId = usize;
 pub type NodeRef = Rc<RefCell<EntityNode>>;
 
 /// Represents the different types of values a configuration field can have
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigValue {
     /// An exact decimal, as written; see [`Number`].
     Number(Number),

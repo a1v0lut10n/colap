@@ -93,6 +93,61 @@ fn check_takes_several_files() {
 }
 
 #[test]
+fn check_with_a_schema_validates_each_file_and_a_broken_schema_stops_it() {
+    let out = colap(&[
+        "check",
+        "--schema",
+        "tests/conformance/schema/registry.schema.md",
+        "tests/conformance/schema/registry-clean.md",
+        "tests/conformance/schema/registry-findings.md",
+    ]);
+    assert_eq!(code(&out), 1);
+    let text = stdout(&out);
+    assert!(!text.contains("registry-clean.md"), "{text}");
+    assert!(
+        text.contains("registry-findings.md:14:9: error: unknown field `nmae` in `llm/Bad`"),
+        "{text}"
+    );
+    assert!(
+        text.contains(": warning: unknown field `motto` in `vendor/acme`"),
+        "{text}"
+    );
+
+    let out = colap(&[
+        "check",
+        "--schema",
+        "tests/conformance/schema/registry.schema.md",
+        "tests/conformance/schema/registry-clean.md",
+    ]);
+    assert_eq!(code(&out), 0, "{}", stdout(&out));
+    assert_eq!(stdout(&out), "");
+
+    // A schema with errors is reported alone; the documents are not read.
+    let out = colap(&[
+        "check",
+        "--schema",
+        "tests/conformance/schema/invalid-utc.schema.md",
+        "tests/conformance/schema/registry-findings.md",
+    ]);
+    assert_eq!(code(&out), 1);
+    let text = stdout(&out);
+    assert!(
+        text.contains("invalid-utc.schema.md:10:17: error:"),
+        "{text}"
+    );
+    assert!(!text.contains("registry-findings.md"), "{text}");
+
+    // A schema with only warnings still validates.
+    let out = colap(&[
+        "check",
+        "--schema",
+        "tests/conformance/schema/lenient.schema.md",
+        "tests/conformance/schema/lenient-ok.md",
+    ]);
+    assert_eq!(code(&out), 0, "{}", stdout(&out));
+}
+
+#[test]
 fn check_without_files_is_a_usage_error() {
     let out = colap(&["check"]);
     assert_eq!(code(&out), 2);

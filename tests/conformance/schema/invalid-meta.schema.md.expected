@@ -1,0 +1,4 @@
+<path>:8:13: error: unknown field `requried` in `schema/entity/llm`
+<path>:10:23: error: value strnig of `type` in `schema/entity/llm/field/name` is not one of [string, integer, float, number, decimal, boolean, symbol, reference, instant, date, datetime, edtf, any]
+<path>:11:38: error: field `min` in `schema/entity/llm/field/size` must be a decimal, got "one"
+<path>:16:13: error: unknown entity `misc` in `schema/entity/llm`
