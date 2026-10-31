@@ -1,0 +1,32 @@
+/// {{doc}}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum {{name}} {
+{{#each variants}}
+    {{#if @first}}#[default]
+    {{/if}}{{variant}},
+{{/each}}
+}
+
+impl {{name}} {
+    /// The symbol as the document writes it.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+{{#each variants}}
+            {{../name}}::{{variant}} => "{{text}}",
+{{/each}}
+        }
+    }
+}
+
+impl std::str::FromStr for {{name}} {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+{{#each variants}}
+            "{{text}}" => Ok({{../name}}::{{variant}}),
+{{/each}}
+            other => Err(format!("`{other}` is not one of {{name}}'s symbols")),
+        }
+    }
+}

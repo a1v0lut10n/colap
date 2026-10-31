@@ -10,7 +10,7 @@
 //! stays the default when no subcommand is given, so `colap FILE`
 //! keeps working.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Arg, ArgAction, ArgMatches, Command};
@@ -21,10 +21,24 @@ use colap::generator::{CodeGenerator, GenerationMode};
 fn generate_args(cmd: Command) -> Command {
     cmd.arg(
         Arg::new("input")
-            .help("Input .cola file or markdown containing cola code blocks")
-            .required(true)
+            .help("Input .cola file or markdown containing cola code blocks; optional with --schema, then validated and copied in for the tests")
+            .required_unless_present("schema")
             .value_parser(clap::value_parser!(PathBuf))
             .index(1),
+    )
+    .arg(
+        Arg::new("schema")
+            .long("schema")
+            .value_name("SCHEMA")
+            .value_parser(clap::value_parser!(PathBuf))
+            .help("Generate from this schema's declarations instead of the input's values (docs/spec/schema.md)"),
+    )
+    .arg(
+        Arg::new("colap-path")
+            .long("colap-path")
+            .value_name("DIR")
+            .value_parser(clap::value_parser!(PathBuf))
+            .help("Make the generated crate depend on this colap checkout instead of the published version"),
     )
     .arg(
         Arg::new("output")
@@ -228,25 +242,17 @@ fn fmt(matches: &ArgMatches) -> ExitCode {
 }
 
 fn generate(matches: &ArgMatches) -> ExitCode {
+    if matches.contains_id("schema") {
+        return generate_from_schema(matches);
+    }
     let Some(input_path) = matches.get_one::<PathBuf>("input").cloned() else {
-        // Unreachable through clap (the argument is required), but a
-        // usage problem is what it would be.
+        // Unreachable through clap (the argument is required without a
+        // schema), but a usage problem is what it would be.
         eprintln!("error: an input file is required");
         return ExitCode::from(2);
     };
 
-    // Crate name: from the option, or the input file stem + "-config",
-    // underscores replaced with hyphens and lowercased.
-    let crate_name = match matches.get_one::<String>("crate-name") {
-        Some(name) => name.clone(),
-        None => {
-            let stem = input_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("generated");
-            format!("{}-config", stem.replace('_', "-").to_lowercase())
-        }
-    };
+    let crate_name = crate_name_for(matches, &input_path, None);
 
     let base_output_dir: PathBuf = matches
         .get_one::<String>("output")
@@ -286,6 +292,10 @@ fn generate(matches: &ArgMatches) -> ExitCode {
     };
 
     let result = CodeGenerator::new(model, generation_mode, input_path.clone())
+        .map(|generator| match matches.get_one::<PathBuf>("colap-path") {
+            Some(path) => generator.with_colap_path(path),
+            None => generator,
+        })
         .and_then(|mut generator| generator.generate());
     if let Err(e) = result {
         eprintln!("{}: error: {e:#}", input_path.display());
@@ -294,5 +304,93 @@ fn generate(matches: &ArgMatches) -> ExitCode {
 
     log::info!("Successfully generated code to {}", output_dir.display());
     log::info!("Generated crate name: {}", crate_name);
+    ExitCode::SUCCESS
+}
+
+/// The crate name: from the option, else the schema's `name`, else
+/// the file stem, with `-config`, underscores replaced with hyphens
+/// and lowercased.
+fn crate_name_for(matches: &ArgMatches, file: &Path, schema_name: Option<&str>) -> String {
+    match matches.get_one::<String>("crate-name") {
+        Some(name) => name.clone(),
+        None => {
+            let stem = schema_name.unwrap_or_else(|| {
+                file.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("generated")
+            });
+            let stem = stem.strip_suffix(".schema").unwrap_or(stem);
+            format!("{}-config", stem.replace('_', "-").to_lowercase())
+        }
+    }
+}
+
+/// `generate --schema`: types from declarations. The input, when
+/// given, is validated first and goes into the crate's tests.
+fn generate_from_schema(matches: &ArgMatches) -> ExitCode {
+    let Some(schema_path) = matches.get_one::<PathBuf>("schema").cloned() else {
+        return ExitCode::from(2);
+    };
+    let loaded = colap::load_schema_file(&schema_path);
+    for finding in &loaded.findings {
+        eprintln!("{finding}");
+    }
+    let clean = loaded.is_clean();
+    let Some(schema) = loaded.schema.filter(|_| clean) else {
+        return ExitCode::from(1);
+    };
+    let schema_text = match std::fs::read_to_string(&schema_path) {
+        Ok(text) => text,
+        Err(e) => {
+            eprintln!("{}: error: {e}", schema_path.display());
+            return ExitCode::from(1);
+        }
+    };
+
+    let input_path = matches.get_one::<PathBuf>("input").cloned();
+    if let Some(input) = &input_path {
+        let mut report = colap::check_file(input);
+        report.validate(&schema);
+        for finding in report.diagnostics() {
+            eprintln!("{finding}");
+        }
+        if !report.is_clean() {
+            return ExitCode::from(1);
+        }
+    }
+
+    let crate_name = crate_name_for(matches, &schema_path, schema.name.as_deref());
+    let base_output_dir: PathBuf = matches
+        .get_one::<String>("output")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("generated"));
+    let output_dir = base_output_dir.join(&crate_name);
+    let generation_mode = match matches.get_one::<String>("mode").map(String::as_str) {
+        Some("module") => GenerationMode::Module {
+            output_file: output_dir.with_extension("rs"),
+        },
+        _ => GenerationMode::Crate {
+            output_dir: output_dir.clone(),
+            crate_name: crate_name.clone(),
+        },
+    };
+
+    let result = colap::generator::SchemaGenerator::new(
+        schema,
+        schema_text,
+        schema_path.clone(),
+        input_path,
+        generation_mode,
+    )
+    .map(|generator| match matches.get_one::<PathBuf>("colap-path") {
+        Some(path) => generator.with_colap_path(path),
+        None => generator,
+    })
+    .and_then(|mut generator| generator.generate());
+    if let Err(e) = result {
+        eprintln!("{}: error: {e:#}", schema_path.display());
+        return ExitCode::from(1);
+    }
+    log::info!("Successfully generated code to {}", output_dir.display());
     ExitCode::SUCCESS
 }

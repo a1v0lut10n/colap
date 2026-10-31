@@ -203,6 +203,7 @@ The colap codebase is organized into the following modules:
 ```bash
 USAGE:
     colap check [--format <text|cola>] [--schema <SCHEMA>] <FILE>...
+    colap generate [--schema <SCHEMA>] [--colap-path <DIR>] [-o DIR] [-n NAME] [-m crate|module] [INPUT]
     colap fmt [--check] <FILE>...
     colap generate [OPTIONS] <input>
     colap [OPTIONS] <input>              # the same as `generate`
@@ -348,6 +349,31 @@ This will:
 2. Generate a single file `src/config_parser.rs`
 3. Include inline unit tests within the module
 4. Ready to be imported with `mod config_parser;` in your project
+
+#### Generating from a schema
+
+With a schema, types come from declarations rather than from the
+sample's literals: a field that is not `required` is an `Option`, a
+`symbol` with `one_of` is an enum, a `decimal` is colap's exact
+`Number`, and the generated `Root::load` validates a file against the
+embedded schema before building it:
+
+```bash
+colap generate --schema registry.schema.md registry.md -o generated
+```
+
+```rust
+use registry_config::{Root, LlmBasis};
+
+let root = Root::load("registry.md").expect("a document matching the schema");
+let gpt = root.llms.get("gpt-4.1").unwrap();
+assert_eq!(gpt.basis, Some(LlmBasis::Parsed));
+```
+
+The document is optional; when given it is validated first and loaded
+by the crate's integration test. `--colap-path <DIR>` makes the
+generated crate depend on a checkout instead of the published colap.
+The type mapping is in `docs/spec/schema.md`, section 7.
 
 #### Custom crate name and output directory
 

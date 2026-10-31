@@ -254,7 +254,9 @@ sample literals: a required field is `T`, an optional one
 `Option<T>`, a list `Vec<T>`, a `symbol` with `one_of` a Rust enum
 named after the field, `reference` a `String` path, the temporal
 types `String` (typed values behind a feature flag, with `jiff`, when
-wanted), `any` a `ConfigValue`; `doc` becomes a doc comment. A
+wanted), `decimal` the exact `Number` (decided `String` here, changed
+in the COLA-0012 plan once the type existed), `any` a `ConfigValue`;
+`doc` becomes a doc comment. A
 collection's entry type comes from its declaration, so an entry that
 happens to hold `1` no longer makes the field `i64` forever. The
 generator ticket decides the rest.

@@ -1,0 +1,21 @@
+{{#if is_crate}}
+use {{crate_name}}::Root;
+{{else}}
+
+#[cfg(test)]
+mod tests {
+    use super::Root;
+{{/if}}
+
+#[test]
+fn the_sample_loads_through_the_schema() {
+    let root = Root::load("{{document}}").unwrap_or_else(|errors| {
+        let text: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+        panic!("{}", text.join("\n"))
+    });
+    let _ = format!("{root:?}");
+    assert_eq!(root, root.clone());
+}
+{{#unless is_crate}}
+}
+{{/unless}}
