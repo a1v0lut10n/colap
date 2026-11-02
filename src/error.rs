@@ -44,25 +44,24 @@ impl Error {
     /// the body's first line.
     pub(crate) fn from_rustemo(err: rustemo::Error, path: Option<&Path>, line_offset: u32) -> Self {
         match err {
-            rustemo::Error::Error {
-                message, location, ..
-            } => {
-                let (line, column) = location
-                    .map(|loc| (loc.start.line() as u32, loc.start.column() as u32))
+            rustemo::Error::ParseError(parse) => {
+                let (line, column) = parse
+                    .span
+                    .map(|span| {
+                        (
+                            span.start.line().unwrap_or(1) as u32,
+                            span.start.column().unwrap_or(0) as u32,
+                        )
+                    })
                     .unwrap_or((1, 0));
                 Error::Parse {
                     path: path.map(Path::to_path_buf),
                     line: line + line_offset,
                     column: column + 1,
-                    // rustemo prefixes the message with a context excerpt;
-                    // the location already says where, so keep the verdict.
-                    message: message
-                        .lines()
-                        .rev()
-                        .find(|l| !l.trim().is_empty())
-                        .unwrap_or("")
-                        .trim()
-                        .to_string(),
+                    // The verdict alone: the span already says where, and
+                    // rustemo's own report (an excerpt with the span marked)
+                    // is `Display` on the error, not its message.
+                    message: parse.message.trim().to_string(),
                 }
             }
             rustemo::Error::IOError(source) => Error::Io {

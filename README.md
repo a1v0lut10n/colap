@@ -226,6 +226,11 @@ Add `colap` to your Rust project:
 colap = "0.4"
 ```
 
+The parser is silent in your debug and test builds. rustemo's parse
+trace, which exists in debug builds only, prints when `RUSTEMO_TRACE`
+is set in the environment; `colap --trace` is the same switch for the
+CLI.
+
 ---
 
 ## 📂 Codebase Structure

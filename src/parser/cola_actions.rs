@@ -2,34 +2,34 @@ use super::cola::{Context, TokenKind};
 use rustemo::Token as RustemoToken;
 /// This file is maintained by rustemo but can be modified manually.
 /// All manual changes will be preserved except non-doc comments.
-use rustemo::{Context as C, ValLoc};
+use rustemo::{Context as C, ValSpan};
 pub type Input = str;
 pub type Ctx<'i> = Context<'i, Input>;
 #[allow(dead_code)]
 pub type Token<'i> = RustemoToken<'i, Input, TokenKind>;
-pub type Identifier = ValLoc<String>;
+pub type Identifier = ValSpan<String>;
 pub fn identifier(_ctx: &Ctx, token: Token) -> Identifier {
-    Identifier::new(token.value.into(), Some(_ctx.location()))
+    Identifier::new(token.value.into(), Some(_ctx.span()))
 }
-pub type Number = ValLoc<String>;
+pub type Number = ValSpan<String>;
 pub fn number(_ctx: &Ctx, token: Token) -> Number {
-    Number::new(token.value.into(), Some(_ctx.location()))
+    Number::new(token.value.into(), Some(_ctx.span()))
 }
-pub type Reference = ValLoc<String>;
+pub type Reference = ValSpan<String>;
 pub fn reference(_ctx: &Ctx, token: Token) -> Reference {
-    Reference::new(token.value.into(), Some(_ctx.location()))
+    Reference::new(token.value.into(), Some(_ctx.span()))
 }
-pub type QuotedStringDouble = ValLoc<String>;
+pub type QuotedStringDouble = ValSpan<String>;
 pub fn quoted_string_double(_ctx: &Ctx, token: Token) -> QuotedStringDouble {
-    QuotedStringDouble::new(token.value.into(), Some(_ctx.location()))
+    QuotedStringDouble::new(token.value.into(), Some(_ctx.span()))
 }
-pub type QuotedStringSingle = ValLoc<String>;
+pub type QuotedStringSingle = ValSpan<String>;
 pub fn quoted_string_single(_ctx: &Ctx, token: Token) -> QuotedStringSingle {
-    QuotedStringSingle::new(token.value.into(), Some(_ctx.location()))
+    QuotedStringSingle::new(token.value.into(), Some(_ctx.span()))
 }
-pub type BlockString = ValLoc<String>;
+pub type BlockString = ValSpan<String>;
 pub fn block_string(_ctx: &Ctx, token: Token) -> BlockString {
-    BlockString::new(token.value.into(), Some(_ctx.location()))
+    BlockString::new(token.value.into(), Some(_ctx.span()))
 }
 pub type Cola = Entity0;
 pub fn cola_entity0(_ctx: &Ctx, entity0: Entity0) -> Cola {
@@ -67,7 +67,7 @@ pub struct PluralEntityBase {
     pub identifier_3: Identifier,
     pub entity_definition: EntityDefinition,
 }
-pub type PluralEntity = ValLoc<PluralEntityBase>;
+pub type PluralEntity = ValSpan<PluralEntityBase>;
 pub fn plural_entity_c1(
     _ctx: &Ctx,
     identifier_1: Identifier,
@@ -80,7 +80,7 @@ pub fn plural_entity_c1(
             identifier_3,
             entity_definition,
         },
-        Some(_ctx.location()),
+        Some(_ctx.span()),
     )
 }
 #[derive(Debug, Clone)]
@@ -88,7 +88,7 @@ pub struct SingularEntityBase {
     pub identifier: Identifier,
     pub entity_definition: EntityDefinition,
 }
-pub type SingularEntity = ValLoc<SingularEntityBase>;
+pub type SingularEntity = ValSpan<SingularEntityBase>;
 pub fn singular_entity_c1(
     _ctx: &Ctx,
     identifier: Identifier,
@@ -99,7 +99,7 @@ pub fn singular_entity_c1(
             identifier,
             entity_definition,
         },
-        Some(_ctx.location()),
+        Some(_ctx.span()),
     )
 }
 pub type EntityDefinition = Item0;
@@ -141,14 +141,14 @@ pub struct FieldBase {
     pub identifier: Identifier,
     pub field_value: FieldValue,
 }
-pub type Field = ValLoc<FieldBase>;
+pub type Field = ValSpan<FieldBase>;
 pub fn field_c1(_ctx: &Ctx, identifier: Identifier, field_value: FieldValue) -> Field {
     Field::new(
         FieldBase {
             identifier,
             field_value,
         },
-        Some(_ctx.location()),
+        Some(_ctx.span()),
     )
 }
 #[derive(Debug, Clone)]

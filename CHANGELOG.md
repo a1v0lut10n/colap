@@ -6,6 +6,29 @@ All notable changes to colap. The format follows
 
 ## [Unreleased]
 
+### Breaking
+
+- **rustemo 0.9.1.** `colap::rustemo` re-exports the new version:
+  `Location` is `SourceSpan` with a mandatory end and `Option` line and
+  column, `ValLoc` is `ValSpan` with a `span` field, and
+  `Error::Error { .. }` is `Error::ParseError(Box<ParseError>)`. Only
+  callers reading the raw AST through `colap::cola` notice; every
+  `colap::Error` line and column is unchanged.
+
+### Changed
+
+- **The parser is quiet in a consumer's debug build.** rustemo's parse
+  trace, compiled in under `debug_assertions`, used to print unless
+  `RUSTEMO_NOTRACE` was set, and nothing colap could do reached it: a
+  library caller's own test run drowned in it. Since rustemo 0.8 the
+  trace is opt-in through `RUSTEMO_TRACE`; `colap --trace` sets that
+  variable, `RUSTEMO_NOTRACE` does nothing any more, and `tests/quiet.rs`
+  holds the parser to silence
+  (`docs/tasks/2026-11/2026-11-01-quiet-parser-in-debug-builds.md`).
+- The parse error message is rustemo's verdict alone; its excerpt with
+  the span marked lives on the rustemo error's `Display`, which colap
+  does not print.
+
 ## [0.4.0] — 2026-10-31
 
 The knowledge repository's needs after 0.3 drove this release: comments
