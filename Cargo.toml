@@ -16,7 +16,7 @@ categories = ["config", "command-line-utilities", "development-tools", "parsing"
 exclude = ["docs/", ".claude/", "CLAUDE.md", ".github/", ".pre-commit-config.yaml", "scripts/"]
 
 [dependencies]
-rustemo = "0.7.1"
+rustemo = "0.9.1"
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 log = "0.4"
@@ -28,7 +28,7 @@ regex = "1"
 serde_json = "1.0"
 
 [build-dependencies]
-rustemo-compiler = "0.7.1"
+rustemo-compiler = "0.9.1"
 
 [[bench]]
 name = "scale"

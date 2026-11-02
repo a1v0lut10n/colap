@@ -108,17 +108,18 @@ impl Pending {
     }
 }
 
+/// A rustemo position as (line, column); rustemo's lexer always fills
+/// both in, so a missing one reads as zero rather than being an error.
+fn line_column(pos: &rustemo::Position) -> Pos {
+    (pos.line().unwrap_or(0) as u32, pos.column().unwrap_or(0))
+}
+
 /// The span of an AST node within the block body.
-fn span(loc: Option<&rustemo::Location>) -> (Pos, Pos) {
+fn span(loc: Option<&rustemo::SourceSpan>) -> (Pos, Pos) {
     let Some(loc) = loc else {
         return ((0, 0), (0, 0));
     };
-    let start = (loc.start.line() as u32, loc.start.column());
-    let end = loc
-        .end
-        .map(|e| (e.line() as u32, e.column()))
-        .unwrap_or(start);
-    (start, end)
+    (line_column(&loc.start), line_column(&loc.end))
 }
 
 impl ModelBuilder {
@@ -217,14 +218,11 @@ impl ModelBuilder {
         builder.finish()
     }
 
-    /// A rustemo location lifted to the file's coordinates.
-    fn location(&self, loc: Option<&rustemo::Location>) -> Option<SourceLocation> {
+    /// A rustemo span lifted to the file's coordinates.
+    fn location(&self, loc: Option<&rustemo::SourceSpan>) -> Option<SourceLocation> {
         let loc = loc?;
-        let (start_line, start_column) = (loc.start.line() as u32, loc.start.column() as u32);
-        let (end_line, end_column) = loc
-            .end
-            .map(|end| (end.line() as u32, end.column() as u32))
-            .unwrap_or((start_line, start_column));
+        let ((start_line, start_column), (end_line, end_column)) = span(Some(loc));
+        let (start_column, end_column) = (start_column as u32, end_column as u32);
         Some(SourceLocation {
             file_path: self.path.clone().unwrap_or_default(),
             start_line: start_line + self.line_offset,
@@ -312,15 +310,15 @@ impl ModelBuilder {
             Entity::SingularEntity(singular) => (
                 singular.identifier.as_ref().trim(),
                 None,
-                self.location(singular.location.as_ref()),
-                span(singular.identifier.location.as_ref()).1,
+                self.location(singular.span.as_ref()),
+                span(singular.identifier.span.as_ref()).1,
                 &singular.entity_definition,
             ),
             Entity::PluralEntity(plural) => (
                 plural.identifier_1.as_ref().trim(),
                 Some(plural.identifier_3.as_ref().trim()),
-                self.location(plural.location.as_ref()),
-                span(plural.identifier_3.location.as_ref()).1,
+                self.location(plural.span.as_ref()),
+                span(plural.identifier_3.span.as_ref()).1,
                 &plural.entity_definition,
             ),
         };
@@ -364,7 +362,7 @@ impl ModelBuilder {
     /// Add a field to an entity in the model; its index when added.
     fn add_field_to_entity(&mut self, entity_id: NodeId, field: &Field) -> Option<usize> {
         let field_name = field.identifier.as_ref().trim().to_string();
-        let location = self.location(field.location.as_ref());
+        let location = self.location(field.span.as_ref());
         let field_value = match Self::convert_field_value(&field.field_value) {
             Ok(value) => value,
             Err(message) => {
@@ -426,16 +424,16 @@ impl ModelBuilder {
     }
 }
 
-fn entity_location(entity: &Entity) -> Option<&rustemo::Location> {
+fn entity_location(entity: &Entity) -> Option<&rustemo::SourceSpan> {
     match entity {
-        Entity::SingularEntity(s) => s.location.as_ref(),
-        Entity::PluralEntity(p) => p.location.as_ref(),
+        Entity::SingularEntity(s) => s.span.as_ref(),
+        Entity::PluralEntity(p) => p.span.as_ref(),
     }
 }
 
-fn item_location(item: &Item) -> Option<&rustemo::Location> {
+fn item_location(item: &Item) -> Option<&rustemo::SourceSpan> {
     match item {
-        Item::Field1(f) | Item::Field2(f) => f.location.as_ref(),
+        Item::Field1(f) | Item::Field2(f) => f.span.as_ref(),
         Item::Entity(e) => entity_location(e),
     }
 }

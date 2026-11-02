@@ -126,18 +126,19 @@ fn cli() -> Command {
     generate_args(cmd)
 }
 
-/// rustemo's trace (debug builds only) prints unless `RUSTEMO_NOTRACE`
-/// is set, and it reads the variable on every call.
+/// rustemo's trace (debug builds only) is off unless `RUSTEMO_TRACE`
+/// is set, and it reads the variable on every call. `--trace` sets it;
+/// without the flag the environment is left as the caller had it, so
+/// an exported `RUSTEMO_TRACE` still works.
 fn set_trace(on: bool) {
+    if !on {
+        return;
+    }
     // SAFETY: called from `main` before any other thread exists, which
     // is the condition under which changing the process environment is
     // sound.
     unsafe {
-        if on {
-            std::env::remove_var("RUSTEMO_NOTRACE");
-        } else {
-            std::env::set_var("RUSTEMO_NOTRACE", "1");
-        }
+        std::env::set_var("RUSTEMO_TRACE", "1");
     }
 }
 

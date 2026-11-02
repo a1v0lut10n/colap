@@ -12,7 +12,7 @@ use colap::parser::cola::ColaParser;
 use colap::parser::cola_actions::{
     Cola, Entity, EntityDefinition, Field, FieldValue, Item, List, Scalar,
 };
-use colap::rustemo::{Parser as _, ValLoc};
+use colap::rustemo::{Parser as _, ValSpan};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -147,25 +147,28 @@ struct Walk<'a> {
 }
 
 impl Walk<'_> {
-    fn term(&mut self, v: &ValLoc<String>, kind: &'static str) {
-        let loc = v.location.expect("terminals carry locations");
-        let end = loc.end.expect("terminals carry an end");
-        let (line, start) = (loc.start.line() as u32, loc.start.column());
-        if end.line() as u32 != line {
-            for l in line..=end.line() as u32 {
+    fn term(&mut self, v: &ValSpan<String>, kind: &'static str) {
+        let loc = v.span.expect("terminals carry spans");
+        let lc = |p: &colap::rustemo::Position| {
+            let line = p.line().expect("lexer positions are line-based") as u32;
+            let column = p.column().expect("lexer positions are line-based");
+            (line, column)
+        };
+        let ((line, start), (end_line, end)) = (lc(&loc.start), lc(&loc.end));
+        if end_line != line {
+            for l in line..=end_line {
                 self.skip.insert(l + self.offset);
             }
             return;
         }
         let text = self.body[line as usize - 1];
         assert_eq!(
-            &text[start..end.column()],
+            &text[start..end],
             v.as_ref(),
             "rustemo location does not match the text on line {line}"
         );
         if !is_keyword(v.as_ref()) {
-            self.terms
-                .insert((line + self.offset, start, end.column(), kind));
+            self.terms.insert((line + self.offset, start, end, kind));
         }
     }
 

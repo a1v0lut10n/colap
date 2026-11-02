@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 type: task
-status: planned
+status: done
 affects:
   - README.md
 tags: [library, diagnostics, rustemo, consumer]
@@ -62,6 +62,19 @@ What is known:
    Setting the environment variable from inside the library is not acceptable: it is
    process-global, and not thread-safe.
 4. **The CLI keeps its trace.** `colap --trace` still works in debug builds.
+
+## Progress note
+
+Executed 2026-11-03 as COLA-0014
+(`docs/implementation/2026-11/2026-11-03-cola-0014-quiet-parser.md`).
+Root cause: rustemo 0.7.1's trace macros print in any debug build unless
+`RUSTEMO_NOTRACE` is set, and `notrace(true)` only touched the build
+script's own environment. rustemo 0.8.0 made the trace opt-in
+(`RUSTEMO_TRACE`), so the fix is the bump to 0.9.1, the task's second
+preference; the profile override is no longer needed, the `rustemo`
+entry alone would have sufficed since every print site is behind
+rustemo's macro. `tests/quiet.rs` is the reproduction; README.md says
+how to get the trace.
 
 ## Explicitly out of scope
 

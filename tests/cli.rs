@@ -7,7 +7,7 @@ use std::process::{Command, Output};
 fn colap(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_colap"))
         .args(args)
-        .env_remove("RUSTEMO_NOTRACE")
+        .env_remove("RUSTEMO_TRACE")
         .output()
         .expect("run colap")
 }

@@ -40,7 +40,6 @@ fn main() {
     let mut settings = rustemo_compiler::Settings::new();
     settings = settings.in_source_tree();
     settings = settings.builder_loc_info(true);
-    settings = settings.notrace(true); // Disable debug trace output
 
     if let Err(e) = settings.process_grammar(Path::new("src/grammar/cola.rustemo")) {
         eprintln!("{e}");
