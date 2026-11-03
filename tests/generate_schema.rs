@@ -78,7 +78,7 @@ fn the_registry_crate_builds_reads_typed_values_and_rejects_findings() {
         assert!(lib.contains(expected), "missing `{expected}` in\n{lib}");
     }
     assert!(read(crate_dir.join("Cargo.toml")).contains(&format!(
-        "colap = {{ path = \"{}\" }}",
+        "colap = {{ path = \"{}\", default-features = false }}",
         env!("CARGO_MANIFEST_DIR")
     )));
     assert!(crate_dir.join("tests/data/config.md").is_file());

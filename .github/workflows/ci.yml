@@ -52,6 +52,36 @@ jobs:
           key: test-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - run: cargo test
 
+  library:
+    name: library (no default features)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: library-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      # COLA-0015: a crate that uses colap as a library builds only
+      # what the library needs. The CLI and generator crates must stay
+      # out of the normal dependency tree when the features are off.
+      - run: cargo clippy --all-targets --no-default-features -- -D warnings
+      - run: cargo test --no-default-features
+      - name: No CLI or generator crate in the library's dependency tree
+        run: |
+          gated=$(cargo tree -e normal --no-default-features --prefix none \
+            | grep -E '^(clap|handlebars|heck|env_logger|log|anyhow|serde_json) ' || true)
+          if [ -n "$gated" ]; then
+            echo "gated crates reached the library build:"
+            echo "$gated"
+            exit 1
+          fi
+
   bench:
     name: bench (scale)
     runs-on: ubuntu-latest
