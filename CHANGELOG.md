@@ -6,6 +6,15 @@ All notable changes to colap. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-03
+
+The first library consumer, a linter over a literate cola knowledge
+repository, drove this release: its test runs drowned in rustemo's
+parse trace, and one dependency line brought the CLI's and the
+generator's crates along. colap now parses quietly in any build, and
+the library builds with three dependencies. The language is unchanged;
+the one breaking change is the version of rustemo the crate re-exports.
+
 ### Breaking
 
 - **rustemo 0.9.1.** `colap::rustemo` re-exports the new version:
@@ -197,7 +206,8 @@ except for string escapes, which are now decoded.
 The release the field test ran against: the markdown-aware grammar, the
 code generator, and the editor highlighter.
 
-[Unreleased]: https://github.com/a1v0lut10n/colap/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/a1v0lut10n/colap/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/a1v0lut10n/colap/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/a1v0lut10n/colap/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/a1v0lut10n/colap/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/a1v0lut10n/colap/releases/tag/v0.2.0

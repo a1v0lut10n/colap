@@ -9,7 +9,7 @@ aspects: []
 # The cola schema dialect
 
 This document is the normative description of cola schemas as
-implemented by colap 0.4. A schema is a cola document that declares
+implemented by colap 0.5. A schema is a cola document that declares
 the shape other cola documents must have; `colap check --schema S.md
 FILE...` validates each file against it. Where the README and this
 document disagree, this document is right. It is itself a literate
