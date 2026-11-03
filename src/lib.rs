@@ -18,10 +18,16 @@
 //! The rustemo-generated parser stays reachable under [`parser`] for
 //! callers that want the raw AST of one cola block, and [`rustemo`] is
 //! re-exported so they need not depend on it themselves.
+//!
+//! The code generator is behind the `generator` cargo feature and the
+//! binary behind `cli`, both on by default; a library caller that
+//! only reads, checks, formats or validates documents can turn them
+//! off with `default-features = false`.
 
 pub mod diagnostic;
 pub mod error;
 pub mod format;
+#[cfg(feature = "generator")]
 pub mod generator;
 pub mod grammar;
 pub mod highlight;

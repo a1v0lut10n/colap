@@ -83,7 +83,10 @@ impl CodeGenerator {
             emitted_structs: HashSet::new(),
             plural_instances: HashSet::new(),
             handlebars,
-            colap_dependency: format!("\"{}\"", env!("CARGO_PKG_VERSION")),
+            colap_dependency: format!(
+                "{{ version = \"{}\", default-features = false }}",
+                env!("CARGO_PKG_VERSION")
+            ),
         })
     }
 
@@ -91,7 +94,7 @@ impl CodeGenerator {
     /// version, for local builds of the generated crate.
     pub fn with_colap_path(mut self, path: &Path) -> Self {
         self.colap_dependency = format!(
-            "{{ path = \"{}\" }}",
+            "{{ path = \"{}\", default-features = false }}",
             path.to_string_lossy()
                 .replace('\\', "\\\\")
                 .replace('"', "\\\"")

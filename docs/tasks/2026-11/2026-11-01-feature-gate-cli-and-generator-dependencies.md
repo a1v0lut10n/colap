@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 type: task
-status: planned
+status: done
 affects:
   - README.md
 tags: [library, dependencies, features, consumer]
@@ -53,6 +53,18 @@ Gating the generator first makes that change local to one feature.
    feature adds.
 5. **A dependency-tree check,** so that `cargo tree -e normal --no-default-features`
    lists no CLI or generator crates.
+
+## Progress note
+
+Executed 2026-11-03 as COLA-0015
+(`docs/implementation/2026-11/2026-11-03-cola-0015-feature-gates.md`),
+after COLA-0014. Inventory: `rustemo`, `regex` and `chrono` are
+the library's (chrono is the temporal types' calendar, not a generator
+header); `serde_json` is the generator's. Features `generator` and
+`cli` as proposed, both default; the library tree is 36 crates instead
+of 80; CI holds the `--no-default-features` build and checks the tree;
+a generated crate depends on the library alone. README.md documents the
+features; the CHANGELOG notes the change under Unreleased for 0.5.0.
 
 ## Explicitly out of scope
 

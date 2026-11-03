@@ -15,20 +15,49 @@ categories = ["config", "command-line-utilities", "development-tools", "parsing"
 # stay in the repository.
 exclude = ["docs/", ".claude/", "CLAUDE.md", ".github/", ".pre-commit-config.yaml", "scripts/"]
 
+[features]
+default = ["cli", "generator"]
+# The code generator (`colap::generator`, `colap generate`).
+generator = ["dep:handlebars", "dep:heck", "dep:serde_json", "dep:anyhow"]
+# The `colap` binary; `cargo install colap` has it by default.
+cli = ["generator", "dep:clap", "dep:env_logger", "dep:log"]
+
+# The library proper needs the first three: the parser, the schema
+# validator's patterns, and the temporal types' calendar. The rest are
+# behind the features above, so a crate that only reads, checks,
+# formats or validates documents builds none of them.
 [dependencies]
 rustemo = "0.9.1"
-anyhow = "1.0"
-clap = { version = "4.5", features = ["derive"] }
-log = "0.4"
-env_logger = "0.11.3"
-heck = "0.5.0"
-handlebars = "6.3.2"
-chrono = "0.4"
 regex = "1"
-serde_json = "1.0"
+chrono = "0.4"
+anyhow = { version = "1.0", optional = true }
+clap = { version = "4.5", features = ["derive"], optional = true }
+log = { version = "0.4", optional = true }
+env_logger = { version = "0.11.3", optional = true }
+heck = { version = "0.5.0", optional = true }
+handlebars = { version = "6.3.2", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [build-dependencies]
 rustemo-compiler = "0.9.1"
+
+[[bin]]
+name = "colap"
+path = "src/main.rs"
+required-features = ["cli"]
+
+# The tests that drive the binary or the generator.
+[[test]]
+name = "cli"
+required-features = ["cli"]
+
+[[test]]
+name = "fmt"
+required-features = ["cli"]
+
+[[test]]
+name = "generate_schema"
+required-features = ["cli"]
 
 [[bench]]
 name = "scale"

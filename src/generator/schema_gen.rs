@@ -190,7 +190,12 @@ impl SchemaGenerator {
             schema_path,
             document,
             mode,
-            colap_dependency: format!("\"{}\"", env!("CARGO_PKG_VERSION")),
+            // The generated crate reads documents; it needs neither the
+            // generator nor the CLI.
+            colap_dependency: format!(
+                "{{ version = \"{}\", default-features = false }}",
+                env!("CARGO_PKG_VERSION")
+            ),
             handlebars,
             names: Names::default(),
         })
@@ -199,7 +204,10 @@ impl SchemaGenerator {
     /// The `colap = …` line of the generated `Cargo.toml`: a path
     /// dependency for local builds.
     pub fn with_colap_path(mut self, path: &Path) -> Self {
-        self.colap_dependency = format!("{{ path = {} }}", raw_toml_string(path));
+        self.colap_dependency = format!(
+            "{{ path = {}, default-features = false }}",
+            raw_toml_string(path)
+        );
         self
     }
 
